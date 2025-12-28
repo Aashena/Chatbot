@@ -1,0 +1,53 @@
+go to cloud.google.com
+click consule botton
+click activate cloud shell
+select the project ex. "My First Project"
+
+If the docker image is supposed to be build in GC (not recommended):{
+    upload files
+
+    build docker image:
+    docker build -t gcr.io/{project_id}/{image_name} .
+
+    Enable Artifact registry 
+
+    docker push gcr.io/{project_id}/{image_name}
+
+    #Deploying the docker image:
+    gcloud run deploy {url_name} \
+    --project {project_id}\
+    --region us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars GOOGLE_API_KEY=your_key,HF_HUB_OFFLINE=1,TRANSFORMERS_OFFLINE=1 \
+    --platform managed \
+    --memory 4Gi \
+    --image gcr.io/{project_id}/{image_name}
+}
+
+If the docker image is made and we want to deploy it in GC run:{
+    gcloud init
+
+    #Create a repository (needed for this):
+    gcloud artifacts repositories create {rep_name} \
+    --repository-format=docker \
+    --location=us-central1 \
+    --description="Docker repository for my FastAPI project (chatbot)"
+
+    #making docker use gcloud in us-central1-docker.pkg.dev domain:
+    gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    # Tag your local image
+    docker tag {image_name} us-central1-docker.pkg.dev/{PROJECT_ID}/{repo_name}/{image_name_incloud}
+
+    # Push to Google Cloud
+    docker push us-central1-docker.pkg.dev/{PROJECT_ID}/{repo_name}/{image_name_incloud}
+
+    gcloud run deploy {url_name} \
+    --project {project_id}\
+    --region us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars GOOGLE_API_KEY=your_key,HF_HUB_OFFLINE=1,TRANSFORMERS_OFFLINE=1 \
+    --platform managed \
+    --memory 4Gi \
+    --image gcr.io/{project_id}/{image_name}
+}

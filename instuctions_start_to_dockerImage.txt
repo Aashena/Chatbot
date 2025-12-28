@@ -1,0 +1,41 @@
+Instruction:
+conda create --name chat_bot python=3.10
+conda activate chat_bot
+conda install pip
+pip install --upgrade openai
+pip install notebook
+pip install -U \
+  langchain \
+  langchain-community \
+  langchain-google-genai \
+  chromadb \
+  beautifulsoup4 \
+  python-dotenv
+
+pip install sentence-transformers
+pip install fastapi
+pip install uvicorn
+
+export GOOGLE_API_KEY=$APIKEY$ #This is for vector db creation
+cd Documents/workplace/ChatBot
+jupyter notebook
+
+For testing the FastAPI:
+uvicorn main:app --reload
+To test the API:
+http://localhost:8000/docs
+
+To export the requirements.txt file for only the packages that we imported in our files:
+pip install pipreqs && pipreqs .
+
+Making the docker image after creating the Dockerfile:
+docker build --platform linux/amd64 \ #to make it compatible with google cloud cpu architechture
+  -t chatbot .
+
+Running the docker image:
+docker run -p 8080:8080 \
+  --platform linux/amd64 \
+  -e GOOGLE_API_KEY=your_key \
+  -e HF_HUB_OFFLINE=1 \
+  -e TRANSFORMERS_OFFLINE=1 \
+  chatbot
