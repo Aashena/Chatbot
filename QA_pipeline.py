@@ -20,10 +20,16 @@ retriever = vectorstore.as_retriever(
 
 #Initialize Gemini LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
+models_list = ["gemini-2.5-flash-lite" , "gemini-2.5-flash"]
+current_model_idx = 0
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
+    model= models_list[current_model_idx] ,
     temperature=0,
+    max_retries=0,
+    additional_kwargs={
+        "retry": None,  # Disable retry policy
+    }
 )
 
 #Create a RAG Prompt
@@ -31,12 +37,16 @@ from langchain_core.prompts import ChatPromptTemplate
 
 prompt = ChatPromptTemplate.from_template("""
 You are a helpful customer-support chatbot.
-Answer the user's question using ONLY the information provided in the context.
-If the answer is not in the context, say "I don't know based on the website content."
+Answer the user's question using the information provided in the 'context' and the 'conversation history'.
+If the question is not related to the given context or the conversation history, say "I don't know based on the website content."
 
 Context:
 ---------
 {context}
+
+Conversation History:
+---------
+{conversation_history}
 
 Question:
 ---------
@@ -65,21 +75,23 @@ from logger import log_interaction
 #     | prompt
 #     | llm
 # )
-def ask(query: str):
+def ask(query: str , conv_history='' ):
     docs = retriever.invoke(query)
     context = format_docs(docs)
 
     response = llm.invoke(
         prompt.format(
             context=context,
-            question=query
+            question=query,
+            conversation_history=conv_history
         )
     )
 
     log_interaction(
         question=query,
         context=context,
-        answer=response.content
+        answer=response.content,
+        conv_history=conv_history
     )
 
     return response.content

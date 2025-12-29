@@ -31,13 +31,14 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     question: str
+    conv_history: str
 
 class ChatResponse(BaseModel):
     answer: str
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
-    answer = ask(request.question)
+    answer = ask(request.question, request.conv_history)
     return {"answer": answer}
 
 @app.get("/health")

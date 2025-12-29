@@ -39,3 +39,6 @@ docker run -p 8080:8080 \
   -e HF_HUB_OFFLINE=1 \
   -e TRANSFORMERS_OFFLINE=1 \
   chatbot
+
+Is that its only benefit?
+  User: What does this product do?\nChatbot: This product helps prevent folate deficiency and neural tube defects when taken daily at least 12 weeks before and during early pregnancy, as part of a healthy diet.\n\nUser: Can you phrase that in simple terms?\nChatbot: This product helps prevent birth defects related to folate deficiency.

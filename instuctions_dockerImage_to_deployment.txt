@@ -51,3 +51,6 @@ If the docker image is made and we want to deploy it in GC run:{
     --memory 4Gi \
     --image gcr.io/{project_id}/{image_name}
 }
+
+After deployment you can track the logs by filtering them:
+jsonPayload.type: "rag_interaction"
