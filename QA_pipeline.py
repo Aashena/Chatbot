@@ -20,17 +20,20 @@ retriever = vectorstore.as_retriever(
 
 #Initialize Gemini LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
-models_list = ["gemini-2.5-flash-lite" , "gemini-2.5-flash"]
+
+models_list = ['gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.5-flash-preview-09-2025', 'gemini-3-flash-preview', "gemini-2.5-flash-lite" , "gemini-2.5-flash", 'gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.0-flash',]
 current_model_idx = 0
 
-llm = ChatGoogleGenerativeAI(
-    model= models_list[current_model_idx] ,
-    temperature=0,
-    max_retries=0,
-    additional_kwargs={
-        "retry": None,  # Disable retry policy
-    }
-)
+def create_llm():
+    global current_model_idx
+    llm = ChatGoogleGenerativeAI(
+        model= models_list[current_model_idx] ,
+        temperature=0,
+        max_retries=0,
+    )
+    current_model_idx +=1
+    return llm
+llm = create_llm()
 
 #Create a RAG Prompt
 from langchain_core.prompts import ChatPromptTemplate
@@ -76,16 +79,24 @@ from logger import log_interaction
 #     | llm
 # )
 def ask(query: str , conv_history='' ):
+    global llm
+
     docs = retriever.invoke(query)
     context = format_docs(docs)
 
-    response = llm.invoke(
-        prompt.format(
-            context=context,
-            question=query,
-            conversation_history=conv_history
-        )
-    )
+    response = None
+    while response is None:
+        try:
+            response = llm.invoke(
+                prompt.format(
+                    context=context,
+                    question=query,
+                    conversation_history=conv_history
+                )
+            )
+        except Exception as e:
+            print(f"Rate limit hit for {models_list[current_model_idx-1]}! Switching model to {models_list[current_model_idx]}...")
+            llm = create_llm()
 
     log_interaction(
         question=query,
