@@ -1,44 +1,16 @@
-#Load the Vector Store from Disk
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-
-# Recreate the embedding function
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")#,
-                                  # model_kwargs={"device": "mps"})
-
-# Load existing Chroma DB
-vectorstore = Chroma(
-    persist_directory="./chroma_db",
-    embedding_function=embeddings,
-)
-
-#Create a Retriever
-retriever = vectorstore.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 10},
-)
-
 #Initialize Gemini LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
+#Create a RAG Prompt
+from langchain_core.prompts import ChatPromptTemplate
+#Build the chain (LangChain LCEL)
+from langchain_core.runnables import RunnablePassthrough
+from logger import log_interaction
+from langchain_community.vectorstores import UpstashVectorStore
 
 models_list = ['gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.5-flash-preview-09-2025', 'gemini-3-flash-preview', "gemini-2.5-flash-lite" , "gemini-2.5-flash", 'gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.0-flash',]
 current_model_idx = 0
 
-def create_llm():
-    global current_model_idx
-    llm = ChatGoogleGenerativeAI(
-        model= models_list[current_model_idx] ,
-        temperature=0,
-        max_retries=0,
-    )
-    current_model_idx +=1
-    return llm
-llm = create_llm()
-
-#Create a RAG Prompt
-from langchain_core.prompts import ChatPromptTemplate
-
-prompt = ChatPromptTemplate.from_template("""
+PROMPT = ChatPromptTemplate.from_template("""
 You are a helpful customer-support chatbot.
 Answer the user's question using the information provided in the 'context' and the 'conversation history'.
 If the question is not related to the given context or the conversation history, say "I don't know based on the website content."
@@ -61,48 +33,67 @@ Answer:
 
 #Create the RAG Chain
 def format_docs(docs):
-    docs_page_content = []
-    for doc in docs:
-        page_content = " ".join(doc.page_content.split() )
-        docs_page_content.append(page_content)
-    return "\n\n".join(doc for doc in docs_page_content)
+    return "\n\n".join(doc.page_content for doc in docs)
 
-#Build the chain (LangChain LCEL)
-from langchain_core.runnables import RunnablePassthrough
-from logger import log_interaction
-# rag_chain = (
-#     {
-#         "context": retriever | format_docs,
-#         "question": RunnablePassthrough(),
-#     }
-#     | prompt
-#     | llm
-# )
-def ask(query: str , conv_history='' ):
-    global llm
-
-    docs = retriever.invoke(query)
-    context = format_docs(docs)
-
-    response = None
-    while response is None:
-        try:
-            response = llm.invoke(
-                prompt.format(
-                    context=context,
-                    question=query,
-                    conversation_history=conv_history
-                )
-            )
-        except Exception as e:
-            print(f"Rate limit hit for {models_list[current_model_idx-1]}! Switching model to {models_list[current_model_idx]}...")
-            llm = create_llm()
-
-    log_interaction(
-        question=query,
-        context=context,
-        answer=response.content,
-        conv_history=conv_history
+def create_llm():
+    llm = ChatGoogleGenerativeAI(
+        model= models_list[current_model_idx] ,
+        temperature=0,
+        max_retries=0,
     )
+    return llm
 
-    return response.content
+def increase_current_model_idx():
+    global current_model_idx
+    current_model_idx +=1
+    if current_model_idx>=len(models_list):
+        current_model_idx=0
+
+class QA_module:
+
+    def __init__(self, name_space):
+        self.namespace = name_space
+        vectorstore = UpstashVectorStore(embedding=True, namespace = name_space)
+        #Create a Retriever
+        self.retriever = vectorstore.as_retriever(
+            search_kwargs={"k": 5},
+        )
+        self.llm = create_llm()
+
+    def ask(self, query: str , conv_history='' ):
+
+        docs = self.retriever.invoke(query)
+        context = format_docs(docs)
+
+        response = None
+        while response is None:
+            try:
+                response = self.llm.invoke(
+                    PROMPT.format(
+                        context=context,
+                        question=query,
+                        conversation_history=conv_history
+                    )
+                )
+            except Exception as e:
+                print(f"Rate limit hit for {models_list[current_model_idx]}! Switching model to {models_list[current_model_idx+1]}...")
+                increase_current_model_idx()
+                self.llm = create_llm()
+
+        log_interaction(
+            namespace=self.namespace,
+            question=query,
+            context=context,
+            answer=response.content,
+            conv_history=conv_history
+        )
+
+        return response.content
+        # rag_chain = (
+    #     {
+    #         "context": retriever | format_docs,
+    #         "question": RunnablePassthrough(),
+    #     }
+    #     | prompt
+    #     | llm
+    # )

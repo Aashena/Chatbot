@@ -18,7 +18,7 @@ If the docker image is supposed to be build in GC (not recommended):{
     --project {project_id}\
     --region us-central1 \
     --allow-unauthenticated \
-    --set-env-vars GOOGLE_API_KEY=your_key,HF_HUB_OFFLINE=1,TRANSFORMERS_OFFLINE=1 \
+    --set-env-vars GOOGLE_API_KEY=your_key,UPSTASH_VECTOR_REST_URL=1,UPSTASH_VECTOR_REST_TOKEN=token \
     --platform managed \
     --memory 4Gi \
     --image gcr.io/{project_id}/{image_name}
@@ -46,7 +46,7 @@ If the docker image is made and we want to deploy it in GC run:{
     --project {project_id}\
     --region us-central1 \
     --allow-unauthenticated \
-    --set-env-vars GOOGLE_API_KEY=your_key,HF_HUB_OFFLINE=1,TRANSFORMERS_OFFLINE=1 \
+    --set-env-vars GOOGLE_API_KEY=your_key,UPSTASH_VECTOR_REST_URL=url,UPSTASH_VECTOR_REST_TOKEN=token \
     --platform managed \
     --memory 4Gi \
     --image gcr.io/{project_id}/{image_name}

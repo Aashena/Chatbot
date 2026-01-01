@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from QA_pipeline import ask
+from QA_pipeline import QA_module
 
 #This line is for loggin in cloud env
 import logging
@@ -32,13 +32,15 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     question: str
     conv_history: str
+    namespace: str
 
 class ChatResponse(BaseModel):
     answer: str
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
-    answer = ask(request.question, request.conv_history)
+    qa_module = QA_module(request.namespace)
+    answer = qa_module.ask(request.question, request.conv_history)
     return {"answer": answer}
 
 @app.get("/health")

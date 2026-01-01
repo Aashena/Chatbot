@@ -340,7 +340,8 @@
           },
           body: JSON.stringify({ 
             question: question,
-            conv_history: convHistory
+            conv_history: convHistory,
+            namespace: 'bio-monitoring.ca'
           })
         })
         .then(function(response) {
