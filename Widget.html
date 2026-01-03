@@ -1,7 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Widget with Markdown Support</title>
+  <!-- Include marked.js and DOMPurify for secure markdown rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+</head>
+<body>
+
 <script>
   (function() {
     // Wait for page to load
     function initChatWidget() {
+      // Configure marked.js options
+      marked.setOptions({
+        breaks: true,        // Convert \n to <br>
+        gfm: true,          // GitHub Flavored Markdown
+        headerIds: false,   // Don't add IDs to headers
+        mangle: false       // Don't escape email addresses
+      });
+
       // Store conversation history
       var conversationHistory = [];
       
@@ -132,7 +152,7 @@
           border-radius: 18px !important;
           max-width: 85% !important;
           word-wrap: break-word !important;
-          white-space: pre-wrap !important;
+          line-height: 1.5 !important;
         }
         .chat-message.chat-user .chat-message-content {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
@@ -144,6 +164,92 @@
           text-align: left !important;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
         }
+        
+        /* Markdown styling for bot messages */
+        .chat-message.chat-bot .chat-message-content p {
+          margin: 0 0 8px 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content p:last-child {
+          margin-bottom: 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content h1,
+        .chat-message.chat-bot .chat-message-content h2,
+        .chat-message.chat-bot .chat-message-content h3,
+        .chat-message.chat-bot .chat-message-content h4 {
+          margin: 12px 0 8px 0 !important;
+          font-weight: 600 !important;
+        }
+        .chat-message.chat-bot .chat-message-content h1 { font-size: 1.4em !important; }
+        .chat-message.chat-bot .chat-message-content h2 { font-size: 1.3em !important; }
+        .chat-message.chat-bot .chat-message-content h3 { font-size: 1.2em !important; }
+        .chat-message.chat-bot .chat-message-content h4 { font-size: 1.1em !important; }
+        
+        .chat-message.chat-bot .chat-message-content ul,
+        .chat-message.chat-bot .chat-message-content ol {
+          margin: 8px 0 !important;
+          padding-left: 20px !important;
+        }
+        .chat-message.chat-bot .chat-message-content li {
+          margin: 4px 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content code {
+          background: #f3f4f6 !important;
+          padding: 2px 6px !important;
+          border-radius: 4px !important;
+          font-family: 'Courier New', monospace !important;
+          font-size: 0.9em !important;
+        }
+        .chat-message.chat-bot .chat-message-content pre {
+          background: #f3f4f6 !important;
+          padding: 12px !important;
+          border-radius: 6px !important;
+          overflow-x: auto !important;
+          margin: 8px 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content pre code {
+          background: none !important;
+          padding: 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content blockquote {
+          border-left: 3px solid #667eea !important;
+          padding-left: 12px !important;
+          margin: 8px 0 !important;
+          color: #666 !important;
+        }
+        .chat-message.chat-bot .chat-message-content a {
+          color: #667eea !important;
+          text-decoration: none !important;
+        }
+        .chat-message.chat-bot .chat-message-content a:hover {
+          text-decoration: underline !important;
+        }
+        .chat-message.chat-bot .chat-message-content strong {
+          font-weight: 600 !important;
+        }
+        .chat-message.chat-bot .chat-message-content em {
+          font-style: italic !important;
+        }
+        .chat-message.chat-bot .chat-message-content hr {
+          border: none !important;
+          border-top: 1px solid #e5e7eb !important;
+          margin: 12px 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+          margin: 8px 0 !important;
+        }
+        .chat-message.chat-bot .chat-message-content table th,
+        .chat-message.chat-bot .chat-message-content table td {
+          border: 1px solid #e5e7eb !important;
+          padding: 6px 8px !important;
+          text-align: left !important;
+        }
+        .chat-message.chat-bot .chat-message-content table th {
+          background: #f3f4f6 !important;
+          font-weight: 600 !important;
+        }
+        
         .chat-thinking {
           display: inline-flex !important;
           gap: 6px !important;
@@ -253,11 +359,20 @@
       var chatInput = document.getElementById('chat-widget-input');
       var sendButton = document.getElementById('chat-widget-send');
   
+      // Function to render markdown safely
+      function renderMarkdown(text) {
+        // Parse markdown to HTML
+        var htmlContent = marked.parse(text);
+        // Sanitize HTML to prevent XSS attacks
+        return DOMPurify.sanitize(htmlContent);
+      }
+  
       // Function to add welcome message
       function addWelcomeMessage() {
         var welcomeMessage = document.createElement('div');
         welcomeMessage.className = 'chat-message chat-bot';
-        welcomeMessage.innerHTML = '<div class="chat-message-content">Hi! I am your Virtual Assistant (VA)!\nI can answer all your questions about the website and its products!\nEg. "What does this product do?"\n(VA\'s developer contact info: moe.yadegari@gmail.com)</div>';
+        var welcomeText = "Hi! I am your **Virtual Assistant (VA)**!\n\nI can answer all your questions about the website and its products!\n\nEg. *\"What does this product do?\"*\n\n(VA's developer contact info: moe.yadegari@gmail.com)";
+        welcomeMessage.innerHTML = '<div class="chat-message-content">' + renderMarkdown(welcomeText) + '</div>';
         chatContent.appendChild(welcomeMessage);
       }
   
@@ -310,7 +425,7 @@
         var question = chatInput.value.trim();
         if (!question) return;
   
-        // Add user message to UI
+        // Add user message to UI (escape HTML for user input)
         var userMessage = document.createElement('div');
         userMessage.className = 'chat-message chat-user';
         userMessage.innerHTML = '<div class="chat-message-content">' + escapeHtml(question) + '</div>';
@@ -352,14 +467,14 @@
           // Remove thinking indicator
           chatContent.removeChild(thinkingMessage);
           
-          // Add bot response to UI
+          // Add bot response to UI with markdown rendering
           var botMessage = document.createElement('div');
           botMessage.className = 'chat-message chat-bot';
-          botMessage.innerHTML = '<div class="chat-message-content">' + escapeHtml(data.answer) + '</div>';
+          botMessage.innerHTML = '<div class="chat-message-content">' + renderMarkdown(data.answer) + '</div>';
           chatContent.appendChild(botMessage);
           chatContent.scrollTop = chatContent.scrollHeight;
   
-          // Add to conversation history
+          // Add to conversation history (store original markdown text)
           conversationHistory.push({
             user: question,
             bot: data.answer
@@ -391,7 +506,7 @@
         return div.innerHTML;
       }
   
-      console.log('Chat widget loaded successfully');
+      console.log('Chat widget loaded successfully with markdown support');
     }
   
     // Initialize when page is ready
@@ -402,3 +517,6 @@
     }
   })();
 </script>
+
+</body>
+</html>
