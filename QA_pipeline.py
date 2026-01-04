@@ -7,15 +7,14 @@ from langchain_core.runnables import RunnablePassthrough
 from logger import log_interaction
 from langchain_community.vectorstores import UpstashVectorStore
 
-models_list = ['gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.5-flash-preview-09-2025', 'gemini-3-flash-preview', "gemini-2.5-flash-lite" , "gemini-2.5-flash", 'gemini-2.5-pro', 'gemini-2.0-flash-lite', 'gemini-2.0-flash',]
+models_list = ['gemini-2.0-flash-lite', 'gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.0-flash', 'gemini-2.5-flash-preview-09-2025', 'gemini-3-flash-preview', "gemini-2.5-flash-lite" , "gemini-2.5-flash", 'gemini-2.5-pro']
 current_model_idx = 0
 
 PROMPT = ChatPromptTemplate.from_template("""
 You are a helpful customer-support chatbot.
-Answer the user's question using the information provided in the 'context' and the 'conversation history'.
-If the question is not related to the given context or the conversation history, say "I don't know based on the website content."
+Answer the user's question using the 'Conversation History' and the information provided in the 'Website Content' as an additional hint.
 
-Context:
+Website Content:
 ---------
 {context}
 
