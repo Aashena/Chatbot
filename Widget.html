@@ -25,6 +25,9 @@
       // Store conversation history
       var conversationHistory = [];
       
+      // Track if initial "Hi" has been sent
+      var hasInitialHiBeenSent = false;
+      
       // Create styles
       var style = document.createElement('style');
       style.textContent = `
@@ -391,6 +394,76 @@
         }
         return formattedHistory;
       }
+      
+      // Function to send automatic "Hi" message
+      function sendAutoHiMessage() {
+        // Add user message "Hi" to UI
+        var userMessage = document.createElement('div');
+        userMessage.className = 'chat-message chat-user';
+        userMessage.innerHTML = '<div class="chat-message-content">Hi</div>';
+        chatContent.appendChild(userMessage);
+
+        // Disable send button during API call
+        sendButton.disabled = true;
+
+        // Add thinking indicator
+        var thinkingMessage = document.createElement('div');
+        thinkingMessage.className = 'chat-message chat-bot';
+        thinkingMessage.innerHTML = '<div class="chat-thinking"><span></span><span></span><span></span></div>';
+        chatContent.appendChild(thinkingMessage);
+
+        chatContent.scrollTop = chatContent.scrollHeight;
+
+        // Get formatted conversation history
+        var convHistory = formatConversationHistory();
+
+        // Make API call with "Hi"
+        fetch('https://chatbotapi-291616033864.us-central1.run.app/chat', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            question: 'Hi',
+            conv_history: convHistory,
+            namespace: 'bio-monitoring.ca'
+          })
+        })
+        .then(function(response) {
+          if (!response.ok) throw new Error('Network response was not ok');
+          return response.json();
+        })
+        .then(function(data) {
+          // Remove thinking indicator
+          chatContent.removeChild(thinkingMessage);
+          
+          // Add bot response to UI with markdown rendering
+          var botMessage = document.createElement('div');
+          botMessage.className = 'chat-message chat-bot';
+          botMessage.innerHTML = '<div class="chat-message-content">' + renderMarkdown(data.answer) + '</div>';
+          chatContent.appendChild(botMessage);
+          chatContent.scrollTop = chatContent.scrollHeight;
+
+          // Add to conversation history
+          conversationHistory.push({
+            user: 'Hi',
+            bot: data.answer
+          });
+        })
+        .catch(function(error) {
+          chatContent.removeChild(thinkingMessage);
+          var errorMessage = document.createElement('div');
+          errorMessage.className = 'chat-message chat-bot';
+          errorMessage.innerHTML = '<div class="chat-message-content">Sorry, I encountered an error. Please try again.</div>';
+          chatContent.appendChild(errorMessage);
+          console.error('Error:', error);
+        })
+        .finally(function() {
+          sendButton.disabled = false;
+          chatInput.focus();
+        });
+      }
   
       // Event listeners
       chatButton.addEventListener('click', function() {
@@ -400,6 +473,12 @@
         // Add welcome message if chat is empty
         if (chatContent.children.length === 0) {
           addWelcomeMessage();
+        }
+        
+        // Send automatic "Hi" message only on first open
+        if (!hasInitialHiBeenSent) {
+          hasInitialHiBeenSent = true;
+          sendAutoHiMessage();
         }
         
         chatInput.focus();
@@ -414,6 +493,9 @@
         // Clear conversation history
         conversationHistory = [];
         
+        // Reset the initial Hi flag
+        hasInitialHiBeenSent = false;
+        
         // Clear chat content
         chatContent.innerHTML = '';
         
@@ -424,28 +506,27 @@
       function sendMessage() {
         var question = chatInput.value.trim();
         if (!question) return;
-  
+
         // Add user message to UI (escape HTML for user input)
         var userMessage = document.createElement('div');
         userMessage.className = 'chat-message chat-user';
         userMessage.innerHTML = '<div class="chat-message-content">' + escapeHtml(question) + '</div>';
         chatContent.appendChild(userMessage);
-  
+
         chatInput.value = '';
         sendButton.disabled = true;
-        chatInput.disabled = true;
-  
+
         // Add thinking indicator
         var thinkingMessage = document.createElement('div');
         thinkingMessage.className = 'chat-message chat-bot';
         thinkingMessage.innerHTML = '<div class="chat-thinking"><span></span><span></span><span></span></div>';
         chatContent.appendChild(thinkingMessage);
-  
+
         chatContent.scrollTop = chatContent.scrollHeight;
-  
+
         // Get formatted conversation history
         var convHistory = formatConversationHistory();
-  
+
         // Make API call with conversation history
         fetch('https://chatbotapi-291616033864.us-central1.run.app/chat', {
           method: 'POST',
@@ -473,7 +554,7 @@
           botMessage.innerHTML = '<div class="chat-message-content">' + renderMarkdown(data.answer) + '</div>';
           chatContent.appendChild(botMessage);
           chatContent.scrollTop = chatContent.scrollHeight;
-  
+
           // Add to conversation history (store original markdown text)
           conversationHistory.push({
             user: question,
@@ -490,7 +571,6 @@
         })
         .finally(function() {
           sendButton.disabled = false;
-          chatInput.disabled = false;
           chatInput.focus();
         });
       }
