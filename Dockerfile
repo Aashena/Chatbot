@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY QA_pipeline.py .
 COPY logger.py .
 COPY main.py .
+COPY telegram_handler.py .
 
 # Expose port (Cloud Run expects 8080)
 EXPOSE 8080

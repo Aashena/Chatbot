@@ -13,13 +13,16 @@ pip install -U \
 pip install sentence-transformers #Only if you want to use a local embedding generation! it is not needed if you use cloud vector database
 pip install fastapi
 pip install uvicorn
-
+pip install requests
 pip install crawl4ai
 playwright install
 
 export GOOGLE_API_KEY=$APIKEY$ #This is for google api
 export UPSTASH_VECTOR_REST_URL=$uspstash_URL$ #This is for vector db
 export UPSTASH_VECTOR_REST_TOKEN=$upstash_token$ #This is for vector db
+export TELEGRAM_BOT_TOKEN=$telegram bot token$ #This is for telegram notification
+export TELEGRAM_CHAT_ID= $telegram chat id$ #This is for telegram notification
+
 cd Documents/workplace/ChatBot
 jupyter notebook
 
@@ -41,4 +44,6 @@ docker run -p 8080:8080 \
   -e GOOGLE_API_KEY=your_key \
   -e UPSTASH_VECTOR_REST_URL=upstash_url \
   -e UPSTASH_VECTOR_REST_TOKEN=upstash_key \
+  -e TELEGRAM_BOT_TOKEN=bot_token \
+  -e TELEGRAM_CHAT_ID = chat_id \
   chatbot

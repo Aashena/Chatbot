@@ -6,6 +6,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from logger import log_interaction
 from langchain_community.vectorstores import UpstashVectorStore
+#To structure the LLM output
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
+#Telegram bot communication
+from telegram_handler import create_alert
 
 models_list = ['gemini-2.0-flash-lite', 'gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.0-flash', 'gemini-2.5-flash-preview-09-2025', 'gemini-3-flash-preview', "gemini-2.5-flash-lite" , "gemini-2.5-flash", 'gemini-2.5-pro']
 current_model_idx = 0
@@ -25,14 +30,26 @@ Conversation History:
 Question:
 ---------
 {question}
-
-Answer:
----------
 """)
 
 #Create the RAG Chain
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
+
+class LLM_Response(BaseModel):
+    answer: str = Field(
+        description="The final answer to the user's question."
+    )
+    source_type: Literal["website_content", "general_knowledge", "none"] = Field(
+        description="Where the information came from. 'none' if the question couldn't be answered."
+    )
+    is_valid: bool = Field(
+        description="True if a helpful answer was provided (even from general knowledge). False if the bot refused to answer or gave a non-answer."
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="The reason why the model could not answer, if applicable."
+    )
 
 def create_llm():
     llm = ChatGoogleGenerativeAI(
@@ -40,7 +57,9 @@ def create_llm():
         temperature=0,
         max_retries=0,
     )
-    return llm
+    #Bind the structure to the model
+    structured_llm = llm.with_structured_output(LLM_Response)
+    return structured_llm
 
 def increase_current_model_idx():
     global current_model_idx
@@ -83,11 +102,14 @@ class QA_module:
             namespace=self.namespace,
             question=query,
             context=context,
-            answer=response.content,
+            response=response,
             conv_history=conv_history
         )
+        
+        if not response.is_valid:
+            create_alert(self.namespace, query, response, conv_history )
 
-        return response.content
+        return response.answer
         # rag_chain = (
     #     {
     #         "context": retriever | format_docs,
