@@ -40,8 +40,8 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     qa_module = QA_module(request.namespace)
-    answer = qa_module.ask(request.question, request.conv_history)
-    return {"answer": answer}
+    response = qa_module.ask(request.question, request.conv_history)
+    return {"answer": response.answer}
 
 @app.get("/health")
 def health():

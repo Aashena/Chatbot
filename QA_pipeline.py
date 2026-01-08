@@ -109,7 +109,7 @@ class QA_module:
         if not response.is_valid:
             create_alert(self.namespace, query, response, conv_history )
 
-        return response.answer
+        return response
         # rag_chain = (
     #     {
     #         "context": retriever | format_docs,
