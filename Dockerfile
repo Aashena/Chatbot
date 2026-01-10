@@ -12,10 +12,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
-COPY QA_pipeline.py .
-COPY logger.py .
-COPY main.py .
-COPY telegram_handler.py .
+COPY src/QA_pipeline.py .
+COPY src/logger.py .
+COPY src/main.py .
+COPY src/telegram_handler.py .
 
 # Expose port (Cloud Run expects 8080)
 EXPOSE 8080

@@ -11,6 +11,7 @@ env:
   REPO_NAME: chatbotrepo        # Change to your Artifact Registry repo name
   IMAGE_NAME: chatbot_api      # Change to your desired image name
   SERVICE_NAME: chatbotapi  # Change to your Cloud Run service name
+  PYTHONPATH: src
 
 jobs:
   test-and-deploy:

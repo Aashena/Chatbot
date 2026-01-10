@@ -2,3 +2,5 @@
 /.ipynb_checkpoints
 /__pycache__
 githelp.txt
+tests/__pycache__
+/.pytest_cache

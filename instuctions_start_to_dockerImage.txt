@@ -16,6 +16,7 @@ pip install uvicorn
 pip install requests
 pip install crawl4ai
 playwright install
+pip install pytest #This is for running tests.
 
 export GOOGLE_API_KEY=$APIKEY$ #This is for google api
 export UPSTASH_VECTOR_REST_URL=$uspstash_URL$ #This is for vector db
