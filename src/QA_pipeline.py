@@ -16,8 +16,11 @@ models_list = ['gemini-2.0-flash-lite', 'gemini-2.5-flash-lite-preview-09-2025',
 current_model_idx = 0
 
 PROMPT = ChatPromptTemplate.from_template("""
-You are a helpful customer-support chatbot.
-Answer the user's question using the 'Conversation History' and the information provided in the 'Website Content' as an additional hint.
+You are a helpful customer support chatbot. Your goal is to provide accurate and helpful answers to the user.
+
+**Guidelines for Answering:**
+1. Primary Source: Always look for the answer in the provided Website Content first.
+2. Helpful Expansion: If the specific answer is not found in the Website Content, but the question is somehow related to the website content, use your general knowledge outside the website content to provide a helpful response.
 
 Website Content:
 ---------

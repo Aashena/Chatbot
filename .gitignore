@@ -4,3 +4,6 @@
 githelp.txt
 tests/__pycache__
 /.pytest_cache
+instuctions_dockerImage_to_deployment.txt
+instuctions_start_to_dockerImage.txt
+src/__pycache__
