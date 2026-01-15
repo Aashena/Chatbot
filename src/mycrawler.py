@@ -21,6 +21,16 @@ def get_domain(url):
     parsed = urlparse(url)
     return parsed.netloc
 
+def get_base_path(url):
+    """Extract the base path from URL (domain + path without query/fragment)."""
+    parsed = urlparse(url)
+    return f"{parsed.netloc}{parsed.path}".rstrip('/')
+
+def is_under_base_path(url, base_path):
+    """Check if URL is under the base path."""
+    url_path = get_base_path(url)
+    return url_path.startswith(base_path)
+
 def is_pdf_url(url):
     """Check if URL points to a PDF file."""
     return url.lower().endswith('.pdf')
@@ -59,8 +69,8 @@ def get_robots_parser(domain_url):
         print(f"⚠ Error parsing robots.txt: {e}")
         return None, None
 
-def extract_urls(url, domain):
-    """Extract all URLs from a page that belong to the same domain."""
+def extract_urls(url, domain, base_path=None):
+    """Extract all URLs from a page that belong to the same domain and optionally under base_path."""
     urls = set()
     
     # Skip URL extraction for PDF files
@@ -88,7 +98,9 @@ def extract_urls(url, domain):
             
             # Check if URL is valid and belongs to the same domain
             if is_valid_url(absolute_url) and get_domain(absolute_url) == domain:
-                urls.add(absolute_url)
+                # If base_path is specified, only include URLs under that path
+                if base_path is None or is_under_base_path(absolute_url, base_path):
+                    urls.add(absolute_url)
                 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching {url}: {e}")
@@ -97,7 +109,7 @@ def extract_urls(url, domain):
     
     return urls
 
-def crawl_url(url, domain, robots_parser, visited_lock, visited, all_urls_lock, all_urls):
+def crawl_url(url, domain, base_path, robots_parser, visited_lock, visited, all_urls_lock, all_urls):
     """
     Crawl a single URL and return discovered URLs.
     Thread-safe function for concurrent crawling.
@@ -120,7 +132,7 @@ def crawl_url(url, domain, robots_parser, visited_lock, visited, all_urls_lock, 
         all_urls.add(url)
     
     # Extract URLs from current page
-    found_urls = extract_urls(url, domain)
+    found_urls = extract_urls(url, domain, base_path)
     
     print(f"  Found {len(found_urls)} URLs on this page")
     
@@ -130,12 +142,12 @@ def crawl_domain(domain_input, respect_robots=True, max_workers=15, max_num_urls
     """
     Crawl all URLs under a domain starting from start_url using concurrent workers.
     Args:
-        domain_input: The domain to crawl
+        domain_input: The domain (and optionally path) to crawl
         respect_robots: Whether to check and respect robots.txt (default: True)
         max_workers: Number of concurrent workers (default: 15)
         max_num_urls: Maximum number of URLs to retrieve (default: 100)
     Returns:
-        set: All discovered URLs under the domain (up to max_num_urls)
+        tuple: (set of URLs, crawl_delay, max_workers)
     """
     start_url = 'https://' + domain_input
     # Normalize the starting URL
@@ -143,10 +155,13 @@ def crawl_domain(domain_input, respect_robots=True, max_workers=15, max_num_urls
     
     if not is_valid_url(start_url):
         print(f"Invalid URL: {start_url}")
-        return set()
+        return set(), DEFAULT_DELAY, max_workers
     
     domain = get_domain(start_url)
+    base_path = get_base_path(start_url)
+    
     print(f"Crawling domain: {domain}")
+    print(f"Base path restriction: {base_path}")
     print(f"Starting from: {start_url}")
     print(f"Using {max_workers} concurrent workers")
     print(f"Maximum URLs to retrieve: {max_num_urls}")
@@ -190,7 +205,7 @@ def crawl_domain(domain_input, respect_robots=True, max_workers=15, max_num_urls
                     url = to_visit.pop()
                     batch.add(url)
                     future = executor.submit(
-                        crawl_url, url, domain, robots_parser, 
+                        crawl_url, url, domain, base_path, robots_parser, 
                         visited_lock, visited, all_urls_lock, all_urls
                     )
                     futures[future] = url
