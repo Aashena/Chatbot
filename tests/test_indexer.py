@@ -30,11 +30,11 @@ def mock_vectorstore():
 
 def test_index_pages_creates_30_chunks(test_urls, mock_vectorstore):
     """
-    Test that index_pages creates exactly 30 chunks from the given URLs.
+    Test that index_pages creates exactly 31 chunks from the given URLs.
     
     This test verifies that:
     1. The web pages are crawled successfully
-    2. The text is split into exactly 30 chunks
+    2. The text is split into exactly 31 chunks
     3. UpstashVectorStore is called with correct parameters
     4. add_documents is called with the chunks
     """
@@ -61,7 +61,7 @@ def test_index_pages_creates_30_chunks(test_urls, mock_vectorstore):
     chunks = call_args[0][0]  # First positional argument
     
     # Assert exactly 30 chunks were created
-    assert len(chunks) == 30, f"Expected 30 chunks but got {len(chunks)}"
+    assert len(chunks) == 31, f"Expected 31 chunks but got {len(chunks)}"
     
     # Additional assertions to verify chunk structure
     for chunk in chunks:

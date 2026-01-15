@@ -5,21 +5,19 @@ from langchain_core.documents import Document
 import asyncio
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import UpstashVectorStore
+import time
 
 # User-Agent for polite crawling
-USER_AGENT = 'Mozilla/5.0 (compatible; MyChatBotIndexing/1.0)'
 FROM = 'yadegari@ualberta.ca'
+USER_AGENT = f'Mozilla/5.0 (compatible; MyChatBotIndexing/1.0-{FROM})'
 MIN_DELAY = 0.1
 MAX_WORKERS = 15
 BATCH_SIZE = 50
 
 async def load_web_docs_parallel(urls, delay, max_workers):
-    browser_config = BrowserConfig(headless=True, verbose=False)
+    browser_config = BrowserConfig(headless=True, verbose=False, 
+    extra_args=[f'--User-Agent={USER_AGENT}'] )
     run_config = CrawlerRunConfig(
-        headers={
-        "User-Agent": USER_AGENT,
-        "From": FROM,
-        }
         cache_mode=CacheMode.BYPASS,
         delay_before_return_html=delay,
         semaphore_count=max_workers,
@@ -50,14 +48,14 @@ async def load_web_docs_parallel(urls, delay, max_workers):
     return documents
 
 def make_batches(lst , batch_size):
-    for i in range(0, len(lst), n):
-           yield lst[i:i + n]
+    for i in range(0, len(lst), batch_size):
+           yield lst[i:i + batch_size]
 
 def index_pages(urls, namespace, delay=0.1,  max_workers=15):
     #The main function
     delay = max(delay , MIN_DELAY)
     max_workers = min(max_workers, MAX_WORKERS)
-    for batch in chunk_list(urls, BATCH_SIZE):
+    for batch in make_batches(urls, BATCH_SIZE):
         docs = asyncio.run(load_web_docs_parallel(batch, delay, max_workers))
         # Chunk the text (VERY important for RAG)
         text_splitter = RecursiveCharacterTextSplitter(
@@ -74,6 +72,6 @@ def index_pages(urls, namespace, delay=0.1,  max_workers=15):
 
         # Add your existing 'chunks' from your previous code
         vectorstore.add_documents(chunks)
-        await asyncio.sleep(delay*10)
+        time.sleep(delay*10)
         
     return True
