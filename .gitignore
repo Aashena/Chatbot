@@ -7,3 +7,4 @@ tests/__pycache__
 instuctions_dockerImage_to_deployment.txt
 instuctions_start_to_dockerImage.txt
 src/__pycache__
+make_vector_db.ipynb
