@@ -1,4 +1,3 @@
-import nest_asyncio
 import re
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 from langchain_core.documents import Document
