@@ -1,5 +1,5 @@
 import pytest
-from mycrawler import crawl_domain
+from mycrawler import crawl_domain, DEFAULT_DELAY
 import time
 
 
@@ -34,7 +34,7 @@ class TestCrawlDomain:
         assert max_workers==5
 
         # Verify delay
-        assert delay==0.1
+        assert delay==DEFAULT_DELAY
 
         # Verify results
         assert isinstance(result, set), "Result should be a set"
@@ -73,7 +73,7 @@ class TestCrawlDomain:
         assert max_workers==5
 
         # Verify delay
-        assert delay==0.1
+        assert delay==DEFAULT_DELAY
     
         # Verify results
         assert isinstance(result, set), "Result should be a set"

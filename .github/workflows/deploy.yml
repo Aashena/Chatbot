@@ -40,6 +40,11 @@ jobs:
     - name: Run Tests
       env:
         PYTHONPATH: ${{ env.PYTHONPATH }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        UPSTASH_VECTOR_REST_URL: ${{ secrets.UPSTASH_VECTOR_REST_URL }}
+        UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.UPSTASH_VECTOR_REST_TOKEN }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         echo "Running test cases..."
         pytest tests/
