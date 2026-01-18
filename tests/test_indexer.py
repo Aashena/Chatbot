@@ -39,13 +39,13 @@ def test_index_pages_creates_30_chunks(test_urls, mock_vectorstore):
     4. add_documents is called with the chunks
     """
     mock_vs_class, mock_vs_instance = mock_vectorstore
-    namespace = "propastry.ca"
+    namespace = "bio-monitoring.ca"
     
     # Run the indexing function
     num_chunks = index_pages(test_urls, namespace)
     
     # Assert exactly 30 chunks were created
-    assert num_chunks > 8, f"Expected more than 8 chunks but got {result}"
+    assert num_chunks > 8, f"Expected more than 8 chunks but got {num_chunks}"
     
     # Verify UpstashVectorStore was instantiated with correct parameters
     mock_vs_class.assert_called_once_with(
@@ -72,7 +72,7 @@ def test_index_pages_no_actual_upstash_connection(test_urls, mock_vectorstore):
     Verify that no actual connection to Upstash servers is made.
     """
     mock_vs_class, mock_vs_instance = mock_vectorstore
-    namespace = "propastry.ca"
+    namespace = "bio-monitoring.ca"
     
     # Run the indexing function
     index_pages(test_urls, namespace)
