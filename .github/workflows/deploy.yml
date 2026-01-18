@@ -24,10 +24,10 @@ jobs:
       uses: actions/checkout@v4
 
     # --- STEP 1: RUN TEST CASES ---
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'  # Change to your Python version
+    # - name: Set up Python # We don't need to install python if we are using "mcr.microsoft.com/playwright/python:v1.57.0-jammy"
+    #   uses: actions/setup-python@v5
+    #   with:
+    #     python-version: '3.10'  # Change to your Python version
     
     - name: Install dependencies
       run: |
