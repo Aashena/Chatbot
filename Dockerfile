@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM mcr.microsoft.com/playwright/python:v1.57.0-jammy
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 # Copy and install Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN playwright install
+#RUN playwright install #no need for this one when using "mcr.microsoft.com/playwright/python:v1.57.0-jammy"
 
 # Copy app code
 COPY src/QA_pipeline.py .

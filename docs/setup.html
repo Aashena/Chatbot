@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RAG Chatbot Setup</title>
+  <title>Virtual Assistant Setup</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
   <style>
@@ -21,7 +21,7 @@
     }
     
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
       background: white;
       border-radius: 16px;
@@ -77,7 +77,7 @@
       font-size: 16px;
     }
     
-    input[type="text"] {
+    input[type="text"], input[type="number"] {
       flex: 1;
       padding: 12px 16px;
       border: 2px solid #e5e7eb;
@@ -86,7 +86,7 @@
       transition: border-color 0.2s;
     }
     
-    input[type="text"]:focus {
+    input[type="text"]:focus, input[type="number"]:focus {
       outline: none;
       border-color: #667eea;
     }
@@ -113,38 +113,107 @@
       cursor: not-allowed;
     }
     
-    .thinking {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: #667eea;
-      font-weight: 600;
-      margin-top: 20px;
-    }
-    
-    .thinking-dots {
+    .button-group {
       display: flex;
-      gap: 6px;
+      gap: 12px;
+      margin-bottom: 20px;
+      align-items: center;
     }
     
-    .thinking-dots span {
-      width: 8px;
+    .stop-btn {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      display: none;
+    }
+    
+    .stop-btn.show {
+      display: block;
+    }
+    
+    .stop-btn:hover:not(:disabled) {
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+    
+    .crawl-status, .index-status {
+      background: #f3f4f6;
+      border-left: 4px solid #667eea;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .crawl-status.show, .index-status.show {
+      display: block;
+    }
+    
+    .crawl-status.error, .index-status.error {
+      border-left-color: #ef4444;
+      background: #fee2e2;
+    }
+    
+    .crawl-status.success, .index-status.success {
+      border-left-color: #10b981;
+      background: #d1fae5;
+    }
+    
+    .status-text {
+      color: #333;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    
+    .session-id {
+      font-size: 12px;
+      color: #666;
+      font-family: monospace;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+    }
+    
+    .progress-bar {
+      width: 100%;
       height: 8px;
-      border-radius: 50%;
-      background: #667eea;
-      animation: bounce 1.4s infinite ease-in-out;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
     }
     
-    .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
-    .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
-    
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+      width: 0%;
     }
     
     .url-editor {
-      margin-top: 30px;
+      margin-top: 20px;
     }
     
     .url-list {
@@ -165,6 +234,18 @@
       border-radius: 6px;
       margin-bottom: 8px;
       transition: background 0.2s;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
     }
     
     .url-item:hover {
@@ -176,12 +257,12 @@
       border: 1px solid #e5e7eb;
       padding: 8px 12px;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 13px;
     }
     
     .url-item button {
       padding: 6px 12px;
-      font-size: 14px;
+      font-size: 13px;
       background: #ef4444;
     }
     
@@ -206,6 +287,11 @@
       margin-top: 20px;
       font-weight: 600;
       text-align: center;
+      display: none;
+    }
+    
+    .success-message.show {
+      display: block;
     }
     
     .error-message {
@@ -216,34 +302,50 @@
       margin-top: 20px;
       font-weight: 600;
       text-align: center;
+      display: none;
     }
     
-    .stats {
-      display: flex;
-      gap: 20px;
-      margin-top: 12px;
-      padding: 12px;
-      background: #f3f4f6;
-      border-radius: 6px;
-      font-size: 14px;
-      color: #666;
+    .error-message.show {
+      display: block;
     }
     
-    .stat-item {
-      display: flex;
+    .thinking {
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      color: #667eea;
+      font-size: 14px;
     }
     
-    .stat-label {
-      font-weight: 600;
-      color: #333;
+    .thinking.hidden {
+      display: none;
+    }
+    
+    .thinking-dots {
+      display: flex;
+      gap: 4px;
+    }
+    
+    .thinking-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #667eea;
+      animation: bounce 1.4s infinite ease-in-out;
+    }
+    
+    .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>RAG Chatbot Setup</h1>
+    <h1>Virtual Assistant Setup</h1>
     <p class="subtitle">Create a custom chatbot for your website using RAG technology</p>
     
     <!-- Step 1: Crawl Domain -->
@@ -257,13 +359,30 @@
         <span class="prefix">https://</span>
         <input type="text" id="domain-input" placeholder="example.com" />
       </div>
-      <button id="crawl-btn">Crawl Website</button>
-      <div id="crawl-thinking" class="thinking hidden">
-        <span>Crawling website...</span>
-        <div class="thinking-dots">
-          <span></span>
-          <span></span>
-          <span></span>
+      
+      <div class="button-group">
+        <button id="crawl-btn">Start Crawling</button>
+        <button id="stop-btn" class="stop-btn">Stop Crawling</button>
+        <div id="crawl-thinking" class="thinking hidden">
+          <span>Crawling website...</span>
+          <div class="thinking-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+      
+      <div id="crawl-status" class="crawl-status"></div>
+      
+      <div class="stats" id="crawl-stats" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-label">Discovered</div>
+          <div class="stat-value" id="stat-discovered">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">To Visit</div>
+          <div class="stat-value" id="stat-to-visit">0</div>
         </div>
       </div>
     </div>
@@ -275,25 +394,45 @@
         Review the discovered URLs below. You can remove unwanted URLs or add additional ones manually. 
         When you're satisfied with the list, click "Process URLs" to index them.
       </p>
-      <div id="crawl-stats" class="stats"></div>
       <div class="url-editor">
         <div class="url-list" id="url-list"></div>
         <button class="add-url-btn" id="add-url-btn">+ Add URL</button>
       </div>
-      <button id="process-btn" style="margin-top: 20px;">Process URLs</button>
-      <div id="process-thinking" class="thinking hidden">
-        <span>Processing and indexing URLs...</span>
-        <div class="thinking-dots">
-          <span></span>
-          <span></span>
-          <span></span>
+      
+      <div class="button-group" style="margin-top: 20px;">
+        <button id="process-btn">Process URLs</button>
+        <div id="index-thinking" class="thinking hidden">
+          <span>Processing and indexing...</span>
+          <div class="thinking-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Index progress section -->
+      <div id="index-status" class="index-status"></div>
+      
+      <div class="stats" id="index-stats" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-label">Batch</div>
+          <div class="stat-value" id="stat-batch">0/0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">URLs Processed</div>
+          <div class="stat-value" id="stat-urls-processed">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Chunks Indexed</div>
+          <div class="stat-value" id="stat-chunks">0</div>
         </div>
       </div>
     </div>
     
     <!-- Success Message -->
-    <div id="success-message" class="success-message hidden"></div>
-    <div id="error-message" class="error-message hidden"></div>
+    <div id="success-message" class="success-message"></div>
+    <div id="error-message" class="error-message"></div>
   </div>
 
   <script src="widget-loader.js"></script>
@@ -303,39 +442,68 @@
     let crawlDelay = 1.0;
     let maxWorkers = 5;
     let namespace = '';
+    let currentSessionId = null;
+    let abortController = null;
     const API_BASE = 'https://chatbotapi-291616033864.us-central1.run.app';
 
     // DOM elements
     const domainInput = document.getElementById('domain-input');
     const crawlBtn = document.getElementById('crawl-btn');
+    const stopBtn = document.getElementById('stop-btn');
     const crawlThinking = document.getElementById('crawl-thinking');
+    const crawlStatus = document.getElementById('crawl-status');
+    const crawlStats = document.getElementById('crawl-stats');
+    const statDiscovered = document.getElementById('stat-discovered');
+    const statToVisit = document.getElementById('stat-to-visit');
     const urlSection = document.getElementById('url-section');
     const urlList = document.getElementById('url-list');
     const addUrlBtn = document.getElementById('add-url-btn');
     const processBtn = document.getElementById('process-btn');
-    const processThinking = document.getElementById('process-thinking');
+    const indexThinking = document.getElementById('index-thinking');
+    const indexStatus = document.getElementById('index-status');
+    const indexStats = document.getElementById('index-stats');
+    const statBatch = document.getElementById('stat-batch');
+    const statUrlsProcessed = document.getElementById('stat-urls-processed');
+    const statChunks = document.getElementById('stat-chunks');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
-    const crawlStats = document.getElementById('crawl-stats');
 
     // Utility functions
-    function showThinking(element) {
-      element.classList.remove('hidden');
-    }
-
-    function hideThinking(element) {
-      element.classList.add('hidden');
+    function updateStatus(message, type = 'info', elementId = 'crawl-status') {
+      const statusEl = document.getElementById(elementId);
+      statusEl.innerHTML = `<div class="status-text">${message}</div>`;
+      statusEl.classList.remove('error', 'success');
+      if (type === 'error') {
+        statusEl.classList.add('error');
+      } else if (type === 'success') {
+        statusEl.classList.add('success');
+      }
+      statusEl.classList.add('show');
     }
 
     function showError(message) {
       errorMessage.textContent = message;
-      errorMessage.classList.remove('hidden');
-      setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+      errorMessage.classList.add('show');
+      successMessage.classList.remove('show');
+      setTimeout(() => errorMessage.classList.remove('show'), 5000);
     }
 
     function showSuccess(message) {
       successMessage.textContent = message;
-      successMessage.classList.remove('hidden');
+      successMessage.classList.add('show');
+      errorMessage.classList.remove('show');
+    }
+
+    // Get all current URLs from the list
+    function getCurrentUrls() {
+      const urlInputs = urlList.querySelectorAll('input[type="text"]');
+      return Array.from(urlInputs).map(input => input.value.trim()).filter(url => url);
+    }
+
+    // Check if URL already exists in the list
+    function urlExists(newUrl) {
+      const currentUrls = getCurrentUrls();
+      return currentUrls.includes(newUrl);
     }
 
     // Create URL item element
@@ -354,23 +522,194 @@
       button.parentElement.remove();
     };
 
-    // Render URL list
-    function renderUrlList() {
-      urlList.innerHTML = '';
-      urlsList.forEach(url => {
-        urlList.appendChild(createUrlItem(url));
-      });
+    // Add URL to the list
+    function addUrlToList(url) {
+      if (!urlExists(url)) {
+        urlsList.push(url);
+        
+        // Show URL section if hidden
+        if (urlSection.classList.contains('hidden')) {
+          urlSection.classList.remove('hidden');
+        }
+        
+        // Add to the list (at the top for latest URLs)
+        urlList.insertBefore(createUrlItem(url), urlList.firstChild);
+      }
     }
 
     // Add URL button handler
     addUrlBtn.addEventListener('click', () => {
       const newUrl = prompt('Enter a new URL (include https://):');
       if (newUrl && newUrl.trim()) {
-        urlList.appendChild(createUrlItem(newUrl.trim()));
+        const trimmedUrl = newUrl.trim();
+        
+        if (urlExists(trimmedUrl)) {
+          showError('This URL is already in the list');
+          return;
+        }
+        
+        addUrlToList(trimmedUrl);
       }
     });
 
-    // Crawl button handler
+    // Handle streaming events
+    function handleStreamEvent(data) {
+      console.log('Stream event:', data);
+      
+      switch (data.type) {
+        case 'session':
+          currentSessionId = data.session_id;
+          updateStatus(
+            `${data.message}<div class="session-id">Session: ${data.session_id}</div>`,
+            'info'
+          );
+          crawlStats.style.display = 'grid';
+          break;
+        
+        case 'config':
+          crawlDelay = data.crawl_delay;
+          maxWorkers = data.max_workers;
+          updateStatus(`Crawling ${data.domain}`, 'info');
+          break;
+          
+        case 'url':
+          addUrlToList(data.url);
+          statDiscovered.textContent = data.total_discovered;
+          updateStatus(`Discovered ${data.total_discovered} URLs...`, 'info');
+          break;
+          
+        case 'progress':
+          statDiscovered.textContent = data.total_discovered;
+          statToVisit.textContent = data.to_visit;
+          updateStatus(
+            `Progress: ${data.total_discovered} discovered, ${data.to_visit} queued`,
+            'info'
+          );
+          break;
+        
+        case 'stopped':
+          updateStatus(`${data.message} (${data.total_discovered} URLs saved)`, 'success');
+          crawlBtn.disabled = false;
+          stopBtn.classList.remove('show');
+          crawlThinking.classList.add('hidden');
+          urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          break;
+          
+        case 'complete':
+          updateStatus(`${data.message} (${data.total_discovered} URLs total)`, 'success');
+          crawlBtn.disabled = false;
+          stopBtn.classList.remove('show');
+          crawlThinking.classList.add('hidden');
+          urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          break;
+          
+        case 'error':
+          if (data.url) {
+            console.error(`Error with URL ${data.url}:`, data.message);
+          } else {
+            updateStatus(`Error: ${data.message}`, 'error');
+          }
+          break;
+      }
+    }
+
+    // Handle index streaming events
+    function handleIndexEvent(data) {
+      console.log('Index event:', data);
+      
+      switch (data.type) {
+        case 'start':
+          indexStats.style.display = 'grid';
+          updateStatus(`Starting indexing of ${data.total_urls} URLs...`, 'info', 'index-status');
+          break;
+        
+        case 'existing_check':
+          updateStatus(`Checking existing URLs... Found ${data.existing_count} already indexed`, 'info', 'index-status');
+          break;
+        
+        case 'filter_complete':
+          updateStatus(
+            `${data.message}`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'batch_start':
+          statBatch.textContent = `${data.batch_number}/${data.total_batches}`;
+          updateStatus(
+            `Processing batch ${data.batch_number} of ${data.total_batches} (${data.batch_size} URLs)`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'docs_loaded':
+          updateStatus(
+            `Loaded ${data.docs_count} documents from batch ${data.batch_number}`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'chunking_complete':
+          updateStatus(
+            `Created ${data.chunks_before_dedup} chunks, removing duplicates...`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'deduplication_complete':
+          updateStatus(
+            `Deduplication complete: ${data.unique_chunks} unique chunks`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'batch_complete':
+          statChunks.textContent = data.total_chunks_so_far;
+          updateStatus(
+            `Batch ${data.batch_number}/${data.total_batches} complete: ${data.batch_chunks} chunks indexed`,
+            'info',
+            'index-status'
+          );
+          break;
+        
+        case 'complete':
+          statChunks.textContent = data.total_chunks;
+          statUrlsProcessed.textContent = data.urls_processed;
+          updateStatus(
+            `✓ Indexing complete! ${data.total_chunks} chunks from ${data.urls_processed} URLs`,
+            'success',
+            'index-status'
+          );
+          showSuccess(`✓ Successfully indexed ${data.urls_processed} URLs into ${data.total_chunks} chunks!`);
+          
+          setTimeout(() => {
+            if (typeof loadChatWidget === 'function') {
+              loadChatWidget(namespace, API_BASE);
+            }
+          }, 2000);
+          break;
+        
+        case 'batch_error':
+          updateStatus(
+            `Error in batch ${data.batch_number}: ${data.message}`,
+            'error',
+            'index-status'
+          );
+          break;
+        
+        case 'error':
+          updateStatus(`Error: ${data.message}`, 'error', 'index-status');
+          showError(`Indexing error: ${data.message}`);
+          break;
+      }
+    }
+
+    // Start crawling with streaming
     crawlBtn.addEventListener('click', async () => {
       const domain = domainInput.value.trim();
       
@@ -382,62 +721,134 @@
       // Set namespace from domain
       namespace = domain.split('/')[0];
 
+      // Reset state
+      urlsList = [];
+      currentSessionId = null;
+      urlList.innerHTML = '';
+      statDiscovered.textContent = '0';
+      statToVisit.textContent = '0';
+      
       crawlBtn.disabled = true;
-      showThinking(crawlThinking);
-      errorMessage.classList.add('hidden');
+      stopBtn.classList.add('show');
+      crawlThinking.classList.remove('hidden');
+      errorMessage.classList.remove('show');
+      successMessage.classList.remove('show');
+      crawlStats.style.display = 'grid';
+      
+      updateStatus('Connecting to crawler...', 'info');
+
+      // Create AbortController for stopping
+      abortController = new AbortController();
 
       try {
-        const response = await fetch(`${API_BASE}/crawl`, {
+        const response = await fetch(`${API_BASE}/crawl/stream`, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ domain: domain })
+          body: JSON.stringify({
+            domain: domain
+          }),
+          signal: abortController.signal
         });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        
-        urlsList = data.urls;
-        crawlDelay = data.crawl_delay;
-        maxWorkers = data.max_workers;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        crawlStats.innerHTML = `
-          <div class="stat-item">
-            <span class="stat-label">Total URLs:</span>
-            <span>${data.total_urls}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Crawl Delay:</span>
-            <span>${data.crawl_delay}s</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Max Workers:</span>
-            <span>${data.max_workers}</span>
-          </div>
-        `;
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('Stream complete');
+            break;
+          }
 
-        renderUrlList();
-        urlSection.classList.remove('hidden');
-        urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          // Decode and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                handleStreamEvent(data);
+              } catch (e) {
+                console.error('Error parsing event:', e, line);
+              }
+            }
+          }
+        }
+
+        // Final cleanup if completed normally
+        if (!abortController.signal.aborted) {
+          crawlBtn.disabled = false;
+          stopBtn.classList.remove('show');
+          crawlThinking.classList.add('hidden');
+        }
 
       } catch (error) {
-        console.error('Crawl error:', error);
-        showError(`Failed to crawl website: ${error.message}`);
-      } finally {
-        hideThinking(crawlThinking);
-        crawlBtn.disabled = false;
+        if (error.name === 'AbortError') {
+          console.log('Stream aborted by user');
+        } else {
+          console.error('Crawl error:', error);
+          updateStatus(`Failed to crawl: ${error.message}`, 'error');
+          showError(`Failed to crawl website: ${error.message}`);
+          crawlBtn.disabled = false;
+          stopBtn.classList.remove('show');
+          crawlThinking.classList.add('hidden');
+        }
       }
     });
 
-    // Process button handler
+    // Stop crawling
+    stopBtn.addEventListener('click', async () => {
+      if (!currentSessionId) {
+        showError('No active crawl session');
+        return;
+      }
+
+      updateStatus('Stopping crawl...', 'info');
+      
+      try {
+        // Call the stop endpoint
+        const response = await fetch(`${API_BASE}/crawl/stop/${currentSessionId}`, {
+          method: 'POST'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Stop response:', result);
+
+        // Also abort the stream
+        if (abortController) {
+          abortController.abort();
+        }
+
+        updateStatus(result.message, 'success');
+        stopBtn.classList.remove('show');
+        crawlThinking.classList.add('hidden');
+        crawlBtn.disabled = false;
+
+      } catch (error) {
+        console.error('Error stopping crawl:', error);
+        showError(`Error stopping: ${error.message}`);
+      }
+    });
+
+    // Process button handler with streaming
     processBtn.addEventListener('click', async () => {
-      const urlInputs = urlList.querySelectorAll('input[type="text"]');
-      const urls = Array.from(urlInputs).map(input => input.value.trim()).filter(url => url);
+      const urls = getCurrentUrls();
 
       if (urls.length === 0) {
         showError('No URLs to process');
@@ -445,15 +856,20 @@
       }
 
       processBtn.disabled = true;
-      showThinking(processThinking);
-      errorMessage.classList.add('hidden');
-      successMessage.classList.add('hidden');
+      indexThinking.classList.remove('hidden');
+      errorMessage.classList.remove('show');
+      successMessage.classList.remove('show');
+      indexStats.style.display = 'grid';
+      
+      // Reset stats
+      statBatch.textContent = '0/0';
+      statUrlsProcessed.textContent = '0';
+      statChunks.textContent = '0';
 
       try {
-        const response = await fetch(`${API_BASE}/index`, {
+        const response = await fetch(`${API_BASE}/index/stream`, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -468,21 +884,44 @@
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        showSuccess(`✓ ${data.message}`);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        setTimeout(() => {
-          if (typeof loadChatWidget === 'function') {
-            loadChatWidget(namespace, API_BASE);
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('Index stream complete');
+            break;
           }
-        }, 2000);
+
+          // Decode and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                handleIndexEvent(data);
+              } catch (e) {
+                console.error('Error parsing index event:', e, line);
+              }
+            }
+          }
+        }
 
       } catch (error) {
         console.error('Index error:', error);
         showError(`Failed to index URLs: ${error.message}`);
+        updateStatus(`Error: ${error.message}`, 'error', 'index-status');
       } finally {
-        hideThinking(processThinking);
         processBtn.disabled = false;
+        indexThinking.classList.add('hidden');
       }
     });
   </script>
