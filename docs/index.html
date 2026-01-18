@@ -156,6 +156,11 @@
       background: #d1fae5;
     }
     
+    .crawl-status.warning, .index-status.warning {
+      border-left-color: #f59e0b;
+      background: #fef3c7;
+    }
+    
     .status-text {
       color: #333;
       font-size: 14px;
@@ -444,7 +449,12 @@
     let namespace = '';
     let currentSessionId = null;
     let abortController = null;
+    let inactivityTimer = null;
     const API_BASE = 'https://chatbotapi-291616033864.us-central1.run.app';
+    
+    // Inactivity timeout duration (in milliseconds)
+    // 2 minutes of no activity will trigger timeout
+    const INACTIVITY_TIMEOUT = 120000; // 2 minutes
 
     // DOM elements
     const domainInput = document.getElementById('domain-input');
@@ -468,15 +478,40 @@
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
 
+    // Inactivity timeout management
+    function resetInactivityTimer(onTimeout) {
+      // Clear existing timer
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      
+      // Set new timer
+      inactivityTimer = setTimeout(() => {
+        console.warn('Inactivity timeout reached - no data received for', INACTIVITY_TIMEOUT / 1000, 'seconds');
+        if (onTimeout) {
+          onTimeout();
+        }
+      }, INACTIVITY_TIMEOUT);
+    }
+
+    function clearInactivityTimer() {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+      }
+    }
+
     // Utility functions
     function updateStatus(message, type = 'info', elementId = 'crawl-status') {
       const statusEl = document.getElementById(elementId);
       statusEl.innerHTML = `<div class="status-text">${message}</div>`;
-      statusEl.classList.remove('error', 'success');
+      statusEl.classList.remove('error', 'success', 'warning');
       if (type === 'error') {
         statusEl.classList.add('error');
       } else if (type === 'success') {
         statusEl.classList.add('success');
+      } else if (type === 'warning') {
+        statusEl.classList.add('warning');
       }
       statusEl.classList.add('show');
     }
@@ -556,6 +591,18 @@
     function handleStreamEvent(data) {
       console.log('Stream event:', data);
       
+      // Reset inactivity timer on every event
+      resetInactivityTimer(() => {
+        updateStatus('Connection timeout: No activity from server', 'error');
+        showError('Connection lost: No updates received for 2 minutes');
+        if (abortController) {
+          abortController.abort();
+        }
+        crawlBtn.disabled = false;
+        stopBtn.classList.remove('show');
+        crawlThinking.classList.add('hidden');
+      });
+      
       switch (data.type) {
         case 'session':
           currentSessionId = data.session_id;
@@ -588,6 +635,7 @@
           break;
         
         case 'stopped':
+          clearInactivityTimer();
           updateStatus(`${data.message} (${data.total_discovered} URLs saved)`, 'success');
           crawlBtn.disabled = false;
           stopBtn.classList.remove('show');
@@ -596,6 +644,7 @@
           break;
           
         case 'complete':
+          clearInactivityTimer();
           updateStatus(`${data.message} (${data.total_discovered} URLs total)`, 'success');
           crawlBtn.disabled = false;
           stopBtn.classList.remove('show');
@@ -616,6 +665,14 @@
     // Handle index streaming events
     function handleIndexEvent(data) {
       console.log('Index event:', data);
+      
+      // Reset inactivity timer on every event
+      resetInactivityTimer(() => {
+        updateStatus('Connection timeout: No activity from server', 'error', 'index-status');
+        showError('Connection lost: No updates received for 2 minutes');
+        processBtn.disabled = false;
+        indexThinking.classList.add('hidden');
+      });
       
       switch (data.type) {
         case 'start':
@@ -678,6 +735,7 @@
           break;
         
         case 'complete':
+          clearInactivityTimer();
           statChunks.textContent = data.total_chunks;
           statUrlsProcessed.textContent = data.urls_processed;
           updateStatus(
@@ -703,6 +761,7 @@
           break;
         
         case 'error':
+          clearInactivityTimer();
           updateStatus(`Error: ${data.message}`, 'error', 'index-status');
           showError(`Indexing error: ${data.message}`);
           break;
@@ -740,6 +799,18 @@
       // Create AbortController for stopping
       abortController = new AbortController();
 
+      // Start inactivity timer
+      resetInactivityTimer(() => {
+        updateStatus('Connection timeout: No activity from server', 'error');
+        showError('Connection lost: No updates received for 2 minutes');
+        if (abortController) {
+          abortController.abort();
+        }
+        crawlBtn.disabled = false;
+        stopBtn.classList.remove('show');
+        crawlThinking.classList.add('hidden');
+      });
+
       try {
         const response = await fetch(`${API_BASE}/crawl/stream`, {
           method: 'POST',
@@ -765,6 +836,7 @@
           
           if (done) {
             console.log('Stream complete');
+            clearInactivityTimer();
             break;
           }
 
@@ -795,6 +867,7 @@
         }
 
       } catch (error) {
+        clearInactivityTimer();
         if (error.name === 'AbortError') {
           console.log('Stream aborted by user');
         } else {
@@ -835,6 +908,9 @@
           abortController.abort();
         }
 
+        // Clear inactivity timer
+        clearInactivityTimer();
+
         updateStatus(result.message, 'success');
         stopBtn.classList.remove('show');
         crawlThinking.classList.add('hidden');
@@ -866,6 +942,14 @@
       statUrlsProcessed.textContent = '0';
       statChunks.textContent = '0';
 
+      // Start inactivity timer
+      resetInactivityTimer(() => {
+        updateStatus('Connection timeout: No activity from server', 'error', 'index-status');
+        showError('Connection lost: No updates received for 2 minutes');
+        processBtn.disabled = false;
+        indexThinking.classList.add('hidden');
+      });
+
       try {
         const response = await fetch(`${API_BASE}/index/stream`, {
           method: 'POST',
@@ -893,6 +977,7 @@
           
           if (done) {
             console.log('Index stream complete');
+            clearInactivityTimer();
             break;
           }
 
@@ -916,6 +1001,7 @@
         }
 
       } catch (error) {
+        clearInactivityTimer();
         console.error('Index error:', error);
         showError(`Failed to index URLs: ${error.message}`);
         updateStatus(`Error: ${error.message}`, 'error', 'index-status');
