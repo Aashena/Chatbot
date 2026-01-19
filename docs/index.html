@@ -441,67 +441,39 @@
   </div>
 
   <script src="widget-loader.js"></script>
-  <script>
-    // Global variables
-    let urlsList = [];
-    let crawlDelay = 1.0;
-    let maxWorkers = 5;
-    let namespace = '';
-    let currentSessionId = null;
-    let abortController = null;
-    let inactivityTimer = null;
+  <script type="module">
+    import { CrawlModule } from './crawl.js';
+    import { IndexModule } from './index.js';
+
+    // ========================================
+    // Configuration
+    // ========================================
     const API_BASE = 'https://chatbotapi-291616033864.us-central1.run.app';
-    
-    // Inactivity timeout duration (in milliseconds)
-    // 2 minutes of no activity will trigger timeout
     const INACTIVITY_TIMEOUT = 120000; // 2 minutes
 
-    // DOM elements
-    const domainInput = document.getElementById('domain-input');
-    const crawlBtn = document.getElementById('crawl-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const crawlThinking = document.getElementById('crawl-thinking');
-    const crawlStatus = document.getElementById('crawl-status');
-    const crawlStats = document.getElementById('crawl-stats');
-    const statDiscovered = document.getElementById('stat-discovered');
-    const statToVisit = document.getElementById('stat-to-visit');
+    // ========================================
+    // Global State
+    // ========================================
+    let namespace = '';
+    let urlsList = [];
+    let inactivityTimer = null;
+
+    // ========================================
+    // DOM Elements
+    // ========================================
     const urlSection = document.getElementById('url-section');
     const urlList = document.getElementById('url-list');
     const addUrlBtn = document.getElementById('add-url-btn');
-    const processBtn = document.getElementById('process-btn');
-    const indexThinking = document.getElementById('index-thinking');
-    const indexStatus = document.getElementById('index-status');
-    const indexStats = document.getElementById('index-stats');
-    const statBatch = document.getElementById('stat-batch');
-    const statUrlsProcessed = document.getElementById('stat-urls-processed');
-    const statChunks = document.getElementById('stat-chunks');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
 
-    // Inactivity timeout management
-    function resetInactivityTimer(onTimeout) {
-      // Clear existing timer
-      if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-      }
-      
-      // Set new timer
-      inactivityTimer = setTimeout(() => {
-        console.warn('Inactivity timeout reached - no data received for', INACTIVITY_TIMEOUT / 1000, 'seconds');
-        if (onTimeout) {
-          onTimeout();
-        }
-      }, INACTIVITY_TIMEOUT);
-    }
-
-    function clearInactivityTimer() {
-      if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = null;
-      }
-    }
-
-    // Utility functions
+    // ========================================
+    // Utility Functions
+    // ========================================
+    
+    /**
+     * Update status message in a status element
+     */
     function updateStatus(message, type = 'info', elementId = 'crawl-status') {
       const statusEl = document.getElementById(elementId);
       statusEl.innerHTML = `<div class="status-text">${message}</div>`;
@@ -516,6 +488,9 @@
       statusEl.classList.add('show');
     }
 
+    /**
+     * Show error message
+     */
     function showError(message) {
       errorMessage.textContent = message;
       errorMessage.classList.add('show');
@@ -523,41 +498,84 @@
       setTimeout(() => errorMessage.classList.remove('show'), 5000);
     }
 
+    /**
+     * Show success message
+     */
     function showSuccess(message) {
       successMessage.textContent = message;
       successMessage.classList.add('show');
       errorMessage.classList.remove('show');
     }
 
-    // Get all current URLs from the list
+    /**
+     * Reset inactivity timer
+     */
+    function resetInactivityTimer(onTimeout) {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      
+      inactivityTimer = setTimeout(() => {
+        console.warn('Inactivity timeout reached - no data received for', INACTIVITY_TIMEOUT / 1000, 'seconds');
+        if (onTimeout) {
+          onTimeout();
+        }
+      }, INACTIVITY_TIMEOUT);
+    }
+
+    /**
+     * Clear inactivity timer
+     */
+    function clearInactivityTimer() {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+      }
+    }
+
+    // ========================================
+    // URL Management Functions
+    // ========================================
+
+    /**
+     * Get all current URLs from the list
+     */
     function getCurrentUrls() {
       const urlInputs = urlList.querySelectorAll('input[type="text"]');
       return Array.from(urlInputs).map(input => input.value.trim()).filter(url => url);
     }
 
-    // Check if URL already exists in the list
+    /**
+     * Check if URL already exists in the list
+     */
     function urlExists(newUrl) {
       const currentUrls = getCurrentUrls();
       return currentUrls.includes(newUrl);
     }
 
-    // Create URL item element
+    /**
+     * Create URL item element
+     */
     function createUrlItem(url) {
       const item = document.createElement('div');
       item.className = 'url-item';
       item.innerHTML = `
         <input type="text" value="${url}" />
-        <button onclick="removeUrlItem(this)">Remove</button>
+        <button onclick="window.removeUrlItem(this)">Remove</button>
       `;
       return item;
     }
 
-    // Remove URL item
+    /**
+     * Remove URL item
+     */
     window.removeUrlItem = function(button) {
       button.parentElement.remove();
     };
 
-    // Add URL to the list
+    /**
+     * Add URL to the list
+     */
     function addUrlToList(url) {
       if (!urlExists(url)) {
         urlsList.push(url);
@@ -572,7 +590,21 @@
       }
     }
 
-    // Add URL button handler
+    /**
+     * Clear all messages
+     */
+    function clearMessages() {
+      errorMessage.classList.remove('show');
+      successMessage.classList.remove('show');
+    }
+
+    // ========================================
+    // Event Handlers
+    // ========================================
+
+    /**
+     * Add URL button handler
+     */
     addUrlBtn.addEventListener('click', () => {
       const newUrl = prompt('Enter a new URL (include https://):');
       if (newUrl && newUrl.trim()) {
@@ -587,429 +619,86 @@
       }
     });
 
-    // Handle streaming events
-    function handleStreamEvent(data) {
-      console.log('Stream event:', data);
-      
-      // Reset inactivity timer on every event
-      resetInactivityTimer(() => {
-        updateStatus('Connection timeout: No activity from server', 'error');
-        showError('Connection lost: No updates received for 2 minutes');
-        if (abortController) {
-          abortController.abort();
-        }
-        crawlBtn.disabled = false;
-        stopBtn.classList.remove('show');
-        crawlThinking.classList.add('hidden');
-      });
-      
-      switch (data.type) {
-        case 'session':
-          currentSessionId = data.session_id;
-          updateStatus(
-            `${data.message}<div class="session-id">Session: ${data.session_id}</div>`,
-            'info'
-          );
-          crawlStats.style.display = 'grid';
-          break;
-        
-        case 'config':
-          crawlDelay = data.crawl_delay;
-          maxWorkers = data.max_workers;
-          updateStatus(`Crawling ${data.domain}`, 'info');
-          break;
-          
-        case 'url':
-          addUrlToList(data.url);
-          statDiscovered.textContent = data.total_discovered;
-          updateStatus(`Discovered ${data.total_discovered} URLs...`, 'info');
-          break;
-          
-        case 'progress':
-          statDiscovered.textContent = data.total_discovered;
-          statToVisit.textContent = data.to_visit;
-          updateStatus(
-            `Progress: ${data.total_discovered} discovered, ${data.to_visit} queued`,
-            'info'
-          );
-          break;
-        
-        case 'stopped':
-          clearInactivityTimer();
-          updateStatus(`${data.message} (${data.total_discovered} URLs saved)`, 'success');
-          crawlBtn.disabled = false;
-          stopBtn.classList.remove('show');
-          crawlThinking.classList.add('hidden');
-          urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          break;
-          
-        case 'complete':
-          clearInactivityTimer();
-          updateStatus(`${data.message} (${data.total_discovered} URLs total)`, 'success');
-          crawlBtn.disabled = false;
-          stopBtn.classList.remove('show');
-          crawlThinking.classList.add('hidden');
-          urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          break;
-          
-        case 'error':
-          if (data.url) {
-            console.error(`Error with URL ${data.url}:`, data.message);
-          } else {
-            updateStatus(`Error: ${data.message}`, 'error');
-          }
-          break;
-      }
-    }
+    // ========================================
+    // Initialize Modules
+    // ========================================
 
-    // Handle index streaming events
-    function handleIndexEvent(data) {
-      console.log('Index event:', data);
-      
-      // Reset inactivity timer on every event
-      resetInactivityTimer(() => {
-        updateStatus('Connection timeout: No activity from server', 'error', 'index-status');
-        showError('Connection lost: No updates received for 2 minutes');
-        processBtn.disabled = false;
-        indexThinking.classList.add('hidden');
-      });
-      
-      switch (data.type) {
-        case 'start':
-          indexStats.style.display = 'grid';
-          updateStatus(`Starting indexing of ${data.total_urls} URLs...`, 'info', 'index-status');
-          break;
-        
-        case 'existing_check':
-          updateStatus(`Checking existing URLs... Found ${data.existing_count} already indexed`, 'info', 'index-status');
-          break;
-        
-        case 'filter_complete':
-          updateStatus(
-            `${data.message}`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'batch_start':
-          statBatch.textContent = `${data.batch_number}/${data.total_batches}`;
-          updateStatus(
-            `Processing batch ${data.batch_number} of ${data.total_batches} (${data.batch_size} URLs)`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'docs_loaded':
-          updateStatus(
-            `Loaded ${data.docs_count} documents from batch ${data.batch_number}`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'chunking_complete':
-          updateStatus(
-            `Created ${data.chunks_before_dedup} chunks, removing duplicates...`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'deduplication_complete':
-          updateStatus(
-            `Deduplication complete: ${data.unique_chunks} unique chunks`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'batch_complete':
-          statChunks.textContent = data.total_chunks_so_far;
-          updateStatus(
-            `Batch ${data.batch_number}/${data.total_batches} complete: ${data.batch_chunks} chunks indexed`,
-            'info',
-            'index-status'
-          );
-          break;
-        
-        case 'complete':
-          clearInactivityTimer();
-          statChunks.textContent = data.total_chunks;
-          statUrlsProcessed.textContent = data.urls_processed;
-          updateStatus(
-            `✓ Indexing complete! ${data.total_chunks} chunks from ${data.urls_processed} URLs`,
-            'success',
-            'index-status'
-          );
-          showSuccess(`✓ Successfully indexed ${data.urls_processed} URLs into ${data.total_chunks} chunks!`);
-          
-          setTimeout(() => {
-            if (typeof loadChatWidget === 'function') {
-              loadChatWidget(namespace, API_BASE);
-            }
-          }, 2000);
-          break;
-        
-        case 'batch_error':
-          updateStatus(
-            `Error in batch ${data.batch_number}: ${data.message}`,
-            'error',
-            'index-status'
-          );
-          break;
-        
-        case 'error':
-          clearInactivityTimer();
-          updateStatus(`Error: ${data.message}`, 'error', 'index-status');
-          showError(`Indexing error: ${data.message}`);
-          break;
-      }
-    }
-
-    // Start crawling with streaming
-    crawlBtn.addEventListener('click', async () => {
-      const domain = domainInput.value.trim();
-      
-      if (!domain) {
-        showError('Please enter a domain name');
-        return;
-      }
-
-      // Set namespace from domain
-      namespace = domain.split('/')[0];
-
-      // Reset state
-      urlsList = [];
-      currentSessionId = null;
-      urlList.innerHTML = '';
-      statDiscovered.textContent = '0';
-      statToVisit.textContent = '0';
-      
-      crawlBtn.disabled = true;
-      stopBtn.classList.add('show');
-      crawlThinking.classList.remove('hidden');
-      errorMessage.classList.remove('show');
-      successMessage.classList.remove('show');
-      crawlStats.style.display = 'grid';
-      
-      updateStatus('Connecting to crawler...', 'info');
-
-      // Create AbortController for stopping
-      abortController = new AbortController();
-
-      // Start inactivity timer
-      resetInactivityTimer(() => {
-        updateStatus('Connection timeout: No activity from server', 'error');
-        showError('Connection lost: No updates received for 2 minutes');
-        if (abortController) {
-          abortController.abort();
-        }
-        crawlBtn.disabled = false;
-        stopBtn.classList.remove('show');
-        crawlThinking.classList.add('hidden');
-      });
-
-      try {
-        const response = await fetch(`${API_BASE}/crawl/stream`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            domain: domain
-          }),
-          signal: abortController.signal
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            console.log('Stream complete');
-            clearInactivityTimer();
-            break;
-          }
-
-          // Decode and add to buffer
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop(); // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                handleStreamEvent(data);
-              } catch (e) {
-                console.error('Error parsing event:', e, line);
-              }
-            }
-          }
-        }
-
-        // Final cleanup if completed normally
-        if (!abortController.signal.aborted) {
-          crawlBtn.disabled = false;
-          stopBtn.classList.remove('show');
-          crawlThinking.classList.add('hidden');
-        }
-
-      } catch (error) {
-        clearInactivityTimer();
-        if (error.name === 'AbortError') {
-          console.log('Stream aborted by user');
-        } else {
-          console.error('Crawl error:', error);
-          updateStatus(`Failed to crawl: ${error.message}`, 'error');
-          showError(`Failed to crawl website: ${error.message}`);
-          crawlBtn.disabled = false;
-          stopBtn.classList.remove('show');
-          crawlThinking.classList.add('hidden');
-        }
+    /**
+     * Initialize Crawl Module
+     */
+    const crawlModule = new CrawlModule({
+      apiBase: API_BASE,
+      updateStatus: updateStatus,
+      showError: showError,
+      resetInactivityTimer: resetInactivityTimer,
+      clearInactivityTimer: clearInactivityTimer,
+      onUrlDiscovered: (url) => {
+        addUrlToList(url);
+      },
+      onComplete: (data) => {
+        console.log('Crawl complete:', data);
+        // Scroll to URL section
+        urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      },
+      onError: (error) => {
+        console.error('Crawl error:', error);
       }
     });
 
-    // Stop crawling
-    stopBtn.addEventListener('click', async () => {
-      if (!currentSessionId) {
-        showError('No active crawl session');
-        return;
-      }
-
-      updateStatus('Stopping crawl...', 'info');
-      
-      try {
-        // Call the stop endpoint
-        const response = await fetch(`${API_BASE}/crawl/stop/${currentSessionId}`, {
-          method: 'POST'
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('Stop response:', result);
-
-        // Also abort the stream
-        if (abortController) {
-          abortController.abort();
-        }
-
-        // Clear inactivity timer
-        clearInactivityTimer();
-
-        updateStatus(result.message, 'success');
-        stopBtn.classList.remove('show');
-        crawlThinking.classList.add('hidden');
-        crawlBtn.disabled = false;
-
-      } catch (error) {
-        console.error('Error stopping crawl:', error);
-        showError(`Error stopping: ${error.message}`);
+    /**
+     * Initialize Index Module
+     */
+    const indexModule = new IndexModule({
+      apiBase: API_BASE,
+      updateStatus: updateStatus,
+      showError: showError,
+      showSuccess: showSuccess,
+      resetInactivityTimer: resetInactivityTimer,
+      clearInactivityTimer: clearInactivityTimer,
+      getCurrentUrls: getCurrentUrls,
+      onComplete: (data) => {
+        console.log('Indexing complete:', data);
+        
+        // Load chat widget after successful indexing
+        setTimeout(() => {
+          if (typeof loadChatWidget === 'function') {
+            loadChatWidget(data.namespace, API_BASE);
+          }
+        }, 2000);
+      },
+      onError: (error) => {
+        console.error('Indexing error:', error);
       }
     });
 
-    // Process button handler with streaming
-    processBtn.addEventListener('click', async () => {
-      const urls = getCurrentUrls();
+    // ========================================
+    // Module Coordination
+    // ========================================
 
-      if (urls.length === 0) {
-        showError('No URLs to process');
-        return;
+    /**
+     * Override crawl module's onComplete to set namespace and config
+     */
+    const originalCrawlComplete = crawlModule.onComplete;
+    crawlModule.onComplete = (data) => {
+      // Call original handler
+      if (originalCrawlComplete) {
+        originalCrawlComplete(data);
       }
-
-      processBtn.disabled = true;
-      indexThinking.classList.remove('hidden');
-      errorMessage.classList.remove('show');
-      successMessage.classList.remove('show');
-      indexStats.style.display = 'grid';
       
-      // Reset stats
-      statBatch.textContent = '0/0';
-      statUrlsProcessed.textContent = '0';
-      statChunks.textContent = '0';
+      // Set namespace from crawled domain
+      namespace = crawlModule.getDomain().split('/')[0];
+      
+      // Pass configuration to index module
+      indexModule.setConfig(namespace, crawlModule.getConfig());
+      
+      // Clear messages
+      clearMessages();
+    };
 
-      // Start inactivity timer
-      resetInactivityTimer(() => {
-        updateStatus('Connection timeout: No activity from server', 'error', 'index-status');
-        showError('Connection lost: No updates received for 2 minutes');
-        processBtn.disabled = false;
-        indexThinking.classList.add('hidden');
-      });
-
-      try {
-        const response = await fetch(`${API_BASE}/index/stream`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            urls: urls,
-            namespace: namespace,
-            delay: crawlDelay,
-            max_workers: maxWorkers
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            console.log('Index stream complete');
-            clearInactivityTimer();
-            break;
-          }
-
-          // Decode and add to buffer
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop(); // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                handleIndexEvent(data);
-              } catch (e) {
-                console.error('Error parsing index event:', e, line);
-              }
-            }
-          }
-        }
-
-      } catch (error) {
-        clearInactivityTimer();
-        console.error('Index error:', error);
-        showError(`Failed to index URLs: ${error.message}`);
-        updateStatus(`Error: ${error.message}`, 'error', 'index-status');
-      } finally {
-        processBtn.disabled = false;
-        indexThinking.classList.add('hidden');
-      }
-    });
+    // ========================================
+    // Application Ready
+    // ========================================
+    console.log('Virtual Assistant Setup initialized');
   </script>
 </body>
 </html>

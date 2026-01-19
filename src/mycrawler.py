@@ -278,6 +278,8 @@ async def crawl_domain_streaming(domain_input, respect_robots=True, max_workers=
     
     def run_crawl():
         """Run the crawl in a separate thread."""
+        last_progress_time = time.time()
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             while to_visit and len(all_urls) < max_num_urls and not controller.is_stopped():
                 futures = {}
@@ -331,8 +333,21 @@ async def crawl_domain_streaming(domain_input, respect_robots=True, max_workers=
                         "to_visit": len(to_visit),
                         "visited": len(visited)
                     })
+                    last_progress_time = time.time()
                 
                 print(f"  Total discovered: {len(all_urls)}, To visit: {len(to_visit)}\n")
+                
+                # Send heartbeat if no progress for 15 seconds
+                current_time = time.time()
+                if current_time - last_progress_time > 15:
+                    with all_urls_lock:
+                        event_queue.put({
+                            "type": "heartbeat",
+                            "total_discovered": len(all_urls),
+                            "to_visit": len(to_visit),
+                            "visited": len(visited)
+                        })
+                    last_progress_time = current_time
                 
                 if len(all_urls) >= max_num_urls:
                     print(f"Reached maximum URL limit of {max_num_urls}")
@@ -354,9 +369,9 @@ async def crawl_domain_streaming(domain_input, respect_robots=True, max_workers=
     # Stream events as they come in
     while True:
         try:
-            # Use get with timeout to allow checking for stop condition
+            # Use get with timeout to allow checking thread status
             event = await asyncio.get_event_loop().run_in_executor(
-                None, event_queue.get, True, 0.5
+                None, event_queue.get, True, 1.0  # 1 second timeout
             )
             
             if event is None:  # Completion signal
@@ -365,7 +380,20 @@ async def crawl_domain_streaming(domain_input, respect_robots=True, max_workers=
             yield event
             
         except Empty:
-            # Timeout - check if we should continue or if stopped
+            # Check if thread is still alive
+            if not crawl_thread.is_alive():
+                # Thread finished, drain remaining events
+                try:
+                    while True:
+                        event = event_queue.get_nowait()
+                        if event is None:
+                            break
+                        yield event
+                except Empty:
+                    pass
+                break
+            
+            # Thread still running, check for stop condition
             if controller.is_stopped():
                 # Drain any remaining events
                 try:
