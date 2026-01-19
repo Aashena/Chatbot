@@ -652,7 +652,7 @@
     /**
      * Initialize Crawl Module SECOND (so it can reference indexModule)
      */
-    const crawlModule = new CrawlModule({
+     const crawlModule = new CrawlModule({
       apiBase: API_BASE,
       updateStatus: updateStatus,
       showError: showError,
@@ -660,15 +660,22 @@
       clearInactivityTimer: clearInactivityTimer,
       onUrlDiscovered: (url) => {
         addUrlToList(url);
+        
+        // Set namespace on first URL discovered (if not already set)
+        if (!namespace) {
+          namespace = crawlModule.getDomain().split('/')[0];
+          indexModule.setConfig(namespace, crawlModule.getConfig());
+          console.log('Namespace set to:', namespace);
+        }
       },
       onComplete: (data) => {
         console.log('Crawl complete:', data);
         
-        // Set namespace from crawled domain
-        namespace = crawlModule.getDomain().split('/')[0];
-        
-        // Pass configuration to index module
-        indexModule.setConfig(namespace, crawlModule.getConfig());
+        // Set namespace from crawled domain (in case no URLs were discovered)
+        if (!namespace) {
+          namespace = crawlModule.getDomain().split('/')[0];
+          indexModule.setConfig(namespace, crawlModule.getConfig());
+        }
         
         // Clear messages
         clearMessages();
@@ -679,7 +686,7 @@
       onError: (error) => {
         console.error('Crawl error:', error);
       }
-    });
+      });
 
 // Remove the "Module Coordination" section entirely
 
