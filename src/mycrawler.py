@@ -13,7 +13,7 @@ USER_AGENT = 'Mozilla/5.0 (compatible; MyChatBotIndexing/1.0)'
 FROM = 'yadegari@ualberta.ca'
 DEFAULT_DELAY = 1
 MAX_NUM_URLS = 1000
-MAX_WORKERS = 5
+MAX_WORKERS = 2
 
 def is_valid_url(url):
     """Check if URL is valid and not a fragment or mailto link."""

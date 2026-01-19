@@ -624,29 +624,7 @@
     // ========================================
 
     /**
-     * Initialize Crawl Module
-     */
-    const crawlModule = new CrawlModule({
-      apiBase: API_BASE,
-      updateStatus: updateStatus,
-      showError: showError,
-      resetInactivityTimer: resetInactivityTimer,
-      clearInactivityTimer: clearInactivityTimer,
-      onUrlDiscovered: (url) => {
-        addUrlToList(url);
-      },
-      onComplete: (data) => {
-        console.log('Crawl complete:', data);
-        // Scroll to URL section
-        urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      },
-      onError: (error) => {
-        console.error('Crawl error:', error);
-      }
-    });
-
-    /**
-     * Initialize Index Module
+     * Initialize Index Module FIRST
      */
     const indexModule = new IndexModule({
       apiBase: API_BASE,
@@ -671,29 +649,39 @@
       }
     });
 
-    // ========================================
-    // Module Coordination
-    // ========================================
-
     /**
-     * Override crawl module's onComplete to set namespace and config
+     * Initialize Crawl Module SECOND (so it can reference indexModule)
      */
-    const originalCrawlComplete = crawlModule.onComplete;
-    crawlModule.onComplete = (data) => {
-      // Call original handler
-      if (originalCrawlComplete) {
-        originalCrawlComplete(data);
+    const crawlModule = new CrawlModule({
+      apiBase: API_BASE,
+      updateStatus: updateStatus,
+      showError: showError,
+      resetInactivityTimer: resetInactivityTimer,
+      clearInactivityTimer: clearInactivityTimer,
+      onUrlDiscovered: (url) => {
+        addUrlToList(url);
+      },
+      onComplete: (data) => {
+        console.log('Crawl complete:', data);
+        
+        // Set namespace from crawled domain
+        namespace = crawlModule.getDomain().split('/')[0];
+        
+        // Pass configuration to index module
+        indexModule.setConfig(namespace, crawlModule.getConfig());
+        
+        // Clear messages
+        clearMessages();
+        
+        // Scroll to URL section
+        urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      },
+      onError: (error) => {
+        console.error('Crawl error:', error);
       }
-      
-      // Set namespace from crawled domain
-      namespace = crawlModule.getDomain().split('/')[0];
-      
-      // Pass configuration to index module
-      indexModule.setConfig(namespace, crawlModule.getConfig());
-      
-      // Clear messages
-      clearMessages();
-    };
+    });
+
+// Remove the "Module Coordination" section entirely
 
     // ========================================
     // Application Ready

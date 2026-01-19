@@ -12,7 +12,7 @@ import hashlib
 FROM = 'yadegari@ualberta.ca'
 USER_AGENT = f'Mozilla/5.0 (compatible; MyChatBotIndexing/1.0-{FROM})'
 MIN_DELAY = 1
-MAX_WORKERS = 5
+MAX_WORKERS = 2
 BATCH_SIZE = 50
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=100
