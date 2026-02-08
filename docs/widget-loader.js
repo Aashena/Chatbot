@@ -58,9 +58,10 @@ function loadChatWidget(customNamespace, apiBase) {
       right: 20px !important;
       width: 450px !important;
       height: 600px !important;
-      background: white !important;
+      background: #1a1b2e !important;
       border-radius: 12px !important;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+      border: 1px solid #2e3055 !important;
       display: none !important;
       flex-direction: column !important;
       z-index: 99999 !important;
@@ -121,7 +122,7 @@ function loadChatWidget(customNamespace, apiBase) {
       flex: 1 !important;
       padding: 20px !important;
       overflow-y: auto !important;
-      background: #f7f8fa !important;
+      background: #151628 !important;
     }
     .chat-message {
       margin-bottom: 16px !important;
@@ -145,10 +146,10 @@ function loadChatWidget(customNamespace, apiBase) {
       color: white !important;
     }
     .chat-message.chat-bot .chat-message-content {
-      background: white !important;
-      color: #333 !important;
+      background: #232442 !important;
+      color: #e2e4f0 !important;
       text-align: left !important;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
     }
     .chat-message.chat-bot .chat-message-content p {
       margin: 0 0 8px 0 !important;
@@ -157,14 +158,16 @@ function loadChatWidget(customNamespace, apiBase) {
       margin-bottom: 0 !important;
     }
     .chat-message.chat-bot .chat-message-content code {
-      background: #f3f4f6 !important;
+      background: #2e3055 !important;
+      color: #c4c8e0 !important;
       padding: 2px 6px !important;
       border-radius: 4px !important;
       font-family: 'Courier New', monospace !important;
       font-size: 0.9em !important;
     }
     .chat-message.chat-bot .chat-message-content pre {
-      background: #f3f4f6 !important;
+      background: #2e3055 !important;
+      color: #c4c8e0 !important;
       padding: 12px !important;
       border-radius: 6px !important;
       overflow-x: auto !important;
@@ -179,9 +182,9 @@ function loadChatWidget(customNamespace, apiBase) {
       display: inline-flex !important;
       gap: 6px !important;
       padding: 12px 16px !important;
-      background: white !important;
+      background: #232442 !important;
       border-radius: 18px !important;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
     }
     .chat-thinking span {
       display: inline-block !important;
@@ -199,8 +202,8 @@ function loadChatWidget(customNamespace, apiBase) {
     }
     #chat-widget-input-container {
       padding: 16px 20px !important;
-      background: white !important;
-      border-top: 1px solid #e5e7eb !important;
+      background: #1a1b2e !important;
+      border-top: 1px solid #2e3055 !important;
       display: flex !important;
       gap: 10px !important;
       align-items: center !important;
@@ -208,11 +211,16 @@ function loadChatWidget(customNamespace, apiBase) {
     #chat-widget-input {
       flex: 1 !important;
       padding: 10px 14px !important;
-      border: 1px solid #e5e7eb !important;
+      border: 1px solid #2e3055 !important;
       border-radius: 20px !important;
       font-size: 14px !important;
       outline: none !important;
       font-family: inherit !important;
+      background: #232442 !important;
+      color: #e2e4f0 !important;
+    }
+    #chat-widget-input::placeholder {
+      color: #6b70a0 !important;
     }
     #chat-widget-input:focus {
       border-color: #667eea !important;
