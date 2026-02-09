@@ -18,21 +18,33 @@ This project provides a complete **Retrieval-Augmented Generation (RAG)** chatbo
 
 ```
 Your Website → Crawler → Content Indexer → Vector Database
-                                                  ↓
-                              Visitor Question → Retriever → LLM → Answer
+                  ↓                               ↓
+         Theme Extractor → AI Widget Generator    Visitor Question → Retriever → LLM → Answer
+                  ↓
+         Themed Embed Code
 ```
 
 1. **Crawl** — The system discovers all pages on your domain while respecting `robots.txt` rules
 2. **Index** — Page content is extracted, cleaned, chunked, deduplicated, and stored as vector embeddings
-3. **Answer** — When a visitor asks a question, the most relevant content chunks are retrieved and fed to a large language model to generate an accurate, grounded response
+3. **Generate Widget** — Your website's CSS is analyzed to extract its color palette, then AI generates a themed chat widget with matching colors, ready to embed
+4. **Answer** — When a visitor asks a question, the most relevant content chunks are retrieved and fed to a large language model to generate an accurate, grounded response
 
 ---
 
 ## Key Features
 
+### AI-Powered Widget Customizer
+- **Automatic theme matching** — the system analyzes your website's CSS and extracts its color palette, then uses AI (Google Gemini) to generate a chat widget that visually matches your site
+- **Live preview** — after generation, a floating widget button appears so you can test the chat directly in the setup tool
+- **One-click customization** — change the button text, shape (pill, circle, rounded-square), and icon (chat, robot, help, headset, sparkle) with a single Apply click
+- **Copy-paste embed code** — get a self-contained `<script>` block that you paste into your website's HTML, no external dependencies to host
+- **Integration guide** — step-by-step instructions for embedding the widget on your site
+- **Prompt injection protection** — user inputs are sanitized before being sent to the LLM, and generated code is validated for safety
+
 ### Virtual Assistant Widget
 - Embeddable chat widget that integrates into any website with a single script tag
-- Dark-themed, responsive UI (works on desktop and mobile)
+- Themed to match your website's colors automatically
+- Dark and light theme support based on your site's design
 - Markdown rendering and code syntax highlighting in responses
 - Conversation history for natural multi-turn dialogue
 - Welcome message personalized to your website
@@ -77,33 +89,33 @@ The backend is fully containerized and deployed on **Google Cloud Run**, providi
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Frontend (docs/)                   │
-│  ┌──────────────┐  ┌─────────────────────────────┐  │
-│  │  Chat Widget  │  │  Management UI (Crawl/Index) │  │
-│  │  (Embeddable) │  │  (Self-Serve Setup Tool)     │  │
-│  └──────┬───────┘  └──────────┬──────────────────┘  │
-└─────────┼──────────────────────┼────────────────────┘
-          │                      │
-          ▼                      ▼
-┌─────────────────────────────────────────────────────┐
-│              FastAPI Backend (src/)                   │
-│  ┌──────────┐  ┌───────────┐  ┌──────────────────┐  │
-│  │  /chat    │  │  /crawl   │  │  /index          │  │
-│  │ endpoint  │  │  stream   │  │  stream           │  │
-│  └─────┬────┘  └─────┬─────┘  └────────┬─────────┘  │
-│        │              │                  │            │
-│  ┌─────▼────┐  ┌──────▼──────┐  ┌───────▼────────┐  │
-│  │ QA Chain  │  │  Crawler    │  │  Indexer        │  │
-│  │ (LLM+RAG)│  │  (Polite)   │  │  (Playwright)   │  │
-│  └─────┬────┘  └─────────────┘  └───────┬────────┘  │
-└────────┼────────────────────────────────┼────────────┘
-         │                                │
-         ▼                                ▼
-┌─────────────────┐            ┌──────────────────────┐
-│  Google Gemini   │            │  Upstash Vector DB    │
-│  (LLM Provider)  │            │  (Embeddings Store)   │
-└──────────────────┘            └───────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                       Frontend (docs/)                            │
+│  ┌──────────────┐  ┌────────────────────┐  ┌──────────────────┐  │
+│  │  Chat Widget  │  │  Management UI      │  │  Widget           │  │
+│  │  (Embeddable) │  │  (Crawl/Index)      │  │  Customizer       │  │
+│  └──────┬───────┘  └────────┬───────────┘  └────────┬─────────┘  │
+└─────────┼───────────────────┼──────────────────────┼─────────────┘
+          │                   │                      │
+          ▼                   ▼                      ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    FastAPI Backend (src/)                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │  /chat    │  │  /crawl  │  │  /index  │  │  /widget          │  │
+│  │ endpoint  │  │  stream  │  │  stream  │  │  generate/custom  │  │
+│  └─────┬────┘  └────┬─────┘  └────┬─────┘  └────────┬─────────┘  │
+│        │             │             │                  │            │
+│  ┌─────▼────┐  ┌─────▼─────┐  ┌───▼──────┐  ┌───────▼────────┐  │
+│  │ QA Chain  │  │  Crawler  │  │  Indexer  │  │  Widget         │  │
+│  │ (LLM+RAG)│  │  (Polite) │  │(Playwrgt)│  │  Customizer     │  │
+│  └─────┬────┘  └───────────┘  └────┬─────┘  └───────┬────────┘  │
+└────────┼───────────────────────────┼────────────────┼────────────┘
+         │                           │                │
+         ▼                           ▼                ▼
+┌─────────────────┐       ┌──────────────────┐  ┌──────────────┐
+│  Google Gemini   │       │  Upstash Vector   │  │  Target       │
+│  (LLM Provider)  │       │  (Embeddings DB)  │  │  Website CSS  │
+└──────────────────┘       └───────────────────┘  └───────────────┘
 ```
 
 ---
@@ -115,7 +127,7 @@ The backend is fully containerized and deployed on **Google Cloud Run**, providi
 | **Backend**   | Python, FastAPI, Uvicorn                             |
 | **LLM**       | Google Gemini (via LangChain)                        |
 | **Vector DB** | Upstash Vector (serverless, managed embeddings)      |
-| **Crawling**  | Crawl4AI, Playwright (headless browser)              |
+| **Crawling**  | Crawl4AI, Playwright (headless browser), BeautifulSoup |
 | **Frontend**  | Vanilla JavaScript, marked.js, DOMPurify             |
 | **Infra**     | Docker, Google Cloud Run, GitHub Actions CI/CD       |
 | **Monitoring**| Google Cloud Logging, Telegram Bot alerts            |
@@ -124,14 +136,16 @@ The backend is fully containerized and deployed on **Google Cloud Run**, providi
 
 ## API Endpoints
 
-| Method | Endpoint               | Description                                  |
-|--------|------------------------|----------------------------------------------|
-| POST   | `/chat`                | Ask a question against an indexed namespace  |
-| POST   | `/crawl/stream`        | Start a streaming crawl session              |
-| POST   | `/crawl/stop/{id}`     | Stop an active crawl session                 |
-| GET    | `/crawl/urls/{id}`     | Get discovered URLs for a session            |
-| POST   | `/index/stream`        | Index URLs with real-time progress streaming |
-| GET    | `/health`              | Health check                                 |
+| Method | Endpoint                  | Description                                     |
+|--------|---------------------------|-------------------------------------------------|
+| POST   | `/chat`                   | Ask a question against an indexed namespace     |
+| POST   | `/crawl/stream`           | Start a streaming crawl session                 |
+| POST   | `/crawl/stop/{id}`        | Stop an active crawl session                    |
+| GET    | `/crawl/urls/{id}`        | Get discovered URLs for a session               |
+| POST   | `/index/stream`           | Index URLs with real-time progress streaming    |
+| POST   | `/widget/generate/stream` | Generate a themed widget via SSE streaming      |
+| POST   | `/widget/customize`       | Customize an existing widget configuration      |
+| GET    | `/health`                 | Health check                                    |
 
 ---
 
@@ -190,16 +204,14 @@ docker run -p 8080:8080 \
 
 ## Embedding the Widget on Your Website
 
-After indexing your site through the [setup tool](https://aashena.github.io/Chatbot/), add the chat widget to your website:
+After crawling and indexing your site through the [setup tool](https://aashena.github.io/Chatbot/), a themed chat widget is automatically generated with colors that match your website. You can:
 
-```html
-<script src="https://aashena.github.io/Chatbot/widget-loader.js"></script>
-<script>
-  loadChatWidget("your-namespace", "https://your-cloudrun-url.run.app");
-</script>
-```
+1. **Preview it live** — a floating chat button appears in the setup tool so you can test it immediately
+2. **Customize it** — change the button text, shape, and icon, then click Apply
+3. **Copy the embed code** — click "Copy Embed Code" to get a self-contained `<script>` block
+4. **Paste it into your site** — add the code before the closing `</body>` tag in your HTML
 
-A floating chat button will appear in the bottom-right corner of your site, ready to answer visitor questions based on your indexed content.
+The generated widget is a single, self-contained script with no external dependencies to host. It includes all styles, markup, and chat logic inline — just paste and deploy.
 
 ---
 
@@ -212,11 +224,13 @@ ChatBot/
 │   ├── QA_pipeline.py           # RAG chain and LLM orchestration
 │   ├── mycrawler.py             # Web crawler with streaming support
 │   ├── indexer.py               # Content indexing pipeline
+│   ├── widget_customizer.py     # Theme extraction, AI config generation, code rendering
 │   ├── logger.py                # Structured cloud logging
 │   └── telegram_handler.py      # Telegram alert notifications
 ├── docs/
 │   ├── index.html               # Self-serve management UI
 │   ├── widget-loader.js         # Embeddable chat widget
+│   ├── widget-customizer.js     # Widget customizer module (frontend)
 │   ├── crawl.js                 # Crawl module (frontend)
 │   └── index.js                 # Index module (frontend)
 ├── tests/                       # pytest test suite
