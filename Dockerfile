@@ -19,6 +19,7 @@ COPY src/main.py .
 COPY src/telegram_handler.py .
 COPY src/mycrawler.py .
 COPY src/indexer.py .
+COPY src/widget_customizer.py .
 
 # Expose port (Cloud Run expects 8080)
 EXPOSE 8080
