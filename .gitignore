@@ -9,3 +9,5 @@ instuctions_start_to_dockerImage.txt
 src/__pycache__
 make_vector_db.ipynb
 /docs/local_setup.html
+.claude/
+.claudeignore

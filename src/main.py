@@ -4,7 +4,11 @@ from pydantic import BaseModel
 from QA_pipeline import QA_module
 from mycrawler import crawl_domain_streaming, CrawlController
 from indexer import index_pages_streaming
-from typing import List
+from widget_customizer import (
+    ThemeExtractor, WidgetConfigGenerator, WidgetCodeRenderer,
+    WidgetConfig, PromptGuard
+)
+from typing import List, Dict
 import json
 import asyncio
 import uuid
@@ -308,6 +312,100 @@ def index(request: IndexRequest):
     except Exception as e:
         logging.error(f"Error in index endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Index error: {str(e)}")
+
+# ============================================================
+# Widget Customizer Endpoints
+# ============================================================
+
+class WidgetGenerateRequest(BaseModel):
+    url: str
+    namespace: str
+    api_base: str
+
+class WidgetCustomizeRequest(BaseModel):
+    config: Dict
+    instruction: str
+    namespace: str
+    api_base: str
+
+@app.post("/widget/generate/stream")
+async def widget_generate_stream(request: WidgetGenerateRequest):
+    """
+    Stream widget generation progress as SSE.
+    Steps: extract theme → generate config with Gemini → render code.
+    """
+    async def event_generator():
+        try:
+            # Step 1: Extract theme
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Analyzing website theme...'})}\n\n"
+            await asyncio.sleep(0)  # yield control
+
+            extractor = ThemeExtractor()
+            theme_colors = extractor.extract_theme(request.url)
+
+            yield f"data: {json.dumps({'type': 'theme', 'colors': theme_colors, 'message': 'Theme colors extracted'})}\n\n"
+            await asyncio.sleep(0)
+
+            # Step 2: Generate config with Gemini
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Generating themed widget with AI...'})}\n\n"
+            await asyncio.sleep(0)
+
+            generator = WidgetConfigGenerator()
+            config = generator.generate_theme_config(theme_colors)
+
+            yield f"data: {json.dumps({'type': 'config', 'config': config.model_dump(), 'message': 'Widget theme generated'})}\n\n"
+            await asyncio.sleep(0)
+
+            # Step 3: Render code
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Rendering widget code...'})}\n\n"
+            await asyncio.sleep(0)
+
+            renderer = WidgetCodeRenderer()
+            code = renderer.render(config, request.namespace, request.api_base)
+            guide = renderer.get_integration_guide()
+
+            yield f"data: {json.dumps({'type': 'complete', 'code': code, 'config': config.model_dump(), 'guide': guide, 'message': 'Widget ready!'})}\n\n"
+
+        except Exception as e:
+            logging.error(f"Error in widget generation: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+@app.post("/widget/customize")
+def widget_customize(request: WidgetCustomizeRequest):
+    """Customize an existing widget config based on user instruction."""
+    # Validate instruction
+    _, is_safe = PromptGuard.sanitize(request.instruction)
+    if not is_safe:
+        raise HTTPException(status_code=400, detail="Customization request blocked: unsafe or empty input")
+
+    try:
+        current_config = WidgetConfig(**request.config)
+        generator = WidgetConfigGenerator()
+        new_config = generator.customize_config(current_config, request.instruction)
+
+        renderer = WidgetCodeRenderer()
+        code = renderer.render(new_config, request.namespace, request.api_base)
+
+        return {
+            "code": code,
+            "config": new_config.model_dump(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error in widget customization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Customization error: {str(e)}")
+
 
 # Health check endpoint
 @app.get("/health")
