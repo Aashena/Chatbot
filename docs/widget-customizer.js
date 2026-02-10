@@ -32,6 +32,7 @@ export class WidgetCustomizerModule {
     this.currentGuide = null;
     this.namespace = null;
     this.widgetApiBase = null;
+    this.websiteUrl = null;
     this.liveConversationHistory = [];
 
     // DOM elements
@@ -48,6 +49,7 @@ export class WidgetCustomizerModule {
       customShape: document.getElementById('custom-widget-shape'),
       customIcon: document.getElementById('custom-widget-icon'),
       applyAllBtn: document.getElementById('apply-all-btn'),
+      recolorBtn: document.getElementById('recolor-btn'),
       // Modals
       codeModal: document.getElementById('code-modal'),
       codeModalClose: document.getElementById('code-modal-close'),
@@ -102,6 +104,11 @@ export class WidgetCustomizerModule {
       this.elements.applyAllBtn.addEventListener('click', () => this.applyAllCustomizations());
     }
 
+    // Recolor button
+    if (this.elements.recolorBtn) {
+      this.elements.recolorBtn.addEventListener('click', () => this.recolorWidget());
+    }
+
     // Enter key on any customization input
     const inputs = [this.elements.customText, this.elements.customShape, this.elements.customIcon];
     inputs.forEach(input => {
@@ -120,6 +127,7 @@ export class WidgetCustomizerModule {
   async startGeneration(url, namespace, apiBase) {
     this.namespace = namespace;
     this.widgetApiBase = apiBase;
+    this.websiteUrl = url;
 
     if (this.elements.section) {
       this.elements.section.classList.remove('hidden');
@@ -731,6 +739,55 @@ export class WidgetCustomizerModule {
       this.showError(`Customization failed: ${error.message}`);
     } finally {
       if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = false;
+    }
+  }
+
+  // ========================================
+  // Recolor Widget
+  // ========================================
+
+  async recolorWidget() {
+    if (!this.currentConfig) {
+      this.showError('No widget to recolor. Generate one first.');
+      return;
+    }
+
+    this.showThinking('Generating new color scheme...');
+    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${this.apiBase}/widget/recolor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: this.currentConfig,
+          url: this.websiteUrl,
+          namespace: this.namespace,
+          api_base: this.widgetApiBase,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error ${response.status}`);
+      }
+
+      const data = await response.json();
+      this.currentConfig = data.config;
+      this.currentCode = data.code;
+
+      this.renderLiveWidget(data.config);
+      this.updateCodeBlock(data.code);
+      this.updatePlaceholders(data.config);
+      this.hideThinking();
+
+      this.showSuccess('Widget colors updated!');
+    } catch (error) {
+      console.error('Recolor error:', error);
+      this.hideThinking();
+      this.showError(`Recolor failed: ${error.message}`);
+    } finally {
+      if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = false;
     }
   }
 

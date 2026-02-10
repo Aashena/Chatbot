@@ -1035,3 +1035,391 @@ class TestThemeCompatibility:
         theme = self.extractor.extract_theme("https://branded-site.com")
         # Should have extracted some accent colors
         assert theme['primary_color'] is not None
+
+
+# ============================================================
+# Recolor Config Tests (WidgetConfigGenerator.recolor_config)
+# ============================================================
+
+class TestRecolorConfig:
+    """Tests for the recolor_config method that generates new color schemes."""
+
+    @patch('widget_customizer.ChatGoogleGenerativeAI')
+    def test_recolor_returns_valid_config(self, mock_llm_class):
+        """Should return a valid WidgetConfig with new colors."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({
+            "primary_color": "#e74c3c",
+            "secondary_color": "#c0392b",
+            "bg_color": "#1a1b2e",
+            "surface_color": "#232442",
+            "text_color": "#e2e4f0",
+            "text_secondary_color": "#9498b8",
+            "border_color": "#2e3055",
+            "user_msg_text_color": "#ffffff",
+            "bot_msg_bg_color": "#232442",
+            "bot_msg_text_color": "#e2e4f0",
+            "input_bg_color": "#232442",
+            "input_text_color": "#e2e4f0",
+            "input_placeholder_color": "#6b70a0",
+            "is_dark": True
+        })
+        mock_llm_instance.invoke.return_value = mock_response
+        mock_llm_class.return_value = mock_llm_instance
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig()
+        theme_colors = {
+            'primary_color': '#667eea',
+            'secondary_color': '#764ba2',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        new_config = generator.recolor_config(current_config, theme_colors)
+        assert isinstance(new_config, WidgetConfig)
+        assert new_config.primary_color == "#e74c3c"
+        assert new_config.secondary_color == "#c0392b"
+
+    @patch('widget_customizer.ChatGoogleGenerativeAI')
+    def test_recolor_preserves_non_color_properties(self, mock_llm_class):
+        """Should keep button_text, button_shape, button_icon, header_title, input_placeholder unchanged."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({
+            "primary_color": "#e74c3c",
+            "secondary_color": "#c0392b",
+            "bg_color": "#1a1b2e",
+            "surface_color": "#232442",
+            "text_color": "#e2e4f0",
+            "text_secondary_color": "#9498b8",
+            "border_color": "#2e3055",
+            "user_msg_text_color": "#ffffff",
+            "bot_msg_bg_color": "#232442",
+            "bot_msg_text_color": "#e2e4f0",
+            "input_bg_color": "#232442",
+            "input_text_color": "#e2e4f0",
+            "input_placeholder_color": "#6b70a0",
+            "is_dark": True
+        })
+        mock_llm_instance.invoke.return_value = mock_response
+        mock_llm_class.return_value = mock_llm_instance
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(
+            button_text="Help Me",
+            button_shape="circle",
+            button_icon="robot",
+            header_title="Support",
+            input_placeholder="Type here...",
+        )
+        theme_colors = {
+            'primary_color': '#667eea',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        new_config = generator.recolor_config(current_config, theme_colors)
+
+        # Non-color properties should be preserved
+        assert new_config.button_text == "Help Me"
+        assert new_config.button_shape == "circle"
+        assert new_config.button_icon == "robot"
+        assert new_config.header_title == "Support"
+        assert new_config.input_placeholder == "Type here..."
+        # Colors should be changed
+        assert new_config.primary_color == "#e74c3c"
+
+    @patch('widget_customizer.ChatGoogleGenerativeAI')
+    def test_recolor_handles_gemini_error(self, mock_llm_class):
+        """Should return current config on Gemini failure."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        mock_llm_instance = MagicMock()
+        mock_llm_instance.invoke.side_effect = Exception("API Error")
+        mock_llm_class.return_value = mock_llm_instance
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(primary_color="#667eea")
+        theme_colors = {
+            'primary_color': '#667eea',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        result = generator.recolor_config(current_config, theme_colors)
+        assert isinstance(result, WidgetConfig)
+        assert result.primary_color == "#667eea"
+
+    @patch('widget_customizer.ChatGoogleGenerativeAI')
+    def test_recolor_handles_invalid_json(self, mock_llm_class):
+        """Should handle invalid JSON from Gemini gracefully."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "This is not valid JSON at all"
+        mock_llm_instance.invoke.return_value = mock_response
+        mock_llm_class.return_value = mock_llm_instance
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(primary_color="#667eea")
+        theme_colors = {
+            'primary_color': '#667eea',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        result = generator.recolor_config(current_config, theme_colors)
+        assert isinstance(result, WidgetConfig)
+        assert result.primary_color == "#667eea"
+
+    @patch('widget_customizer.ChatGoogleGenerativeAI')
+    def test_recolor_passes_current_colors_in_prompt(self, mock_llm_class):
+        """Should include current color scheme in the prompt to Gemini."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = json.dumps({
+            "primary_color": "#e74c3c",
+            "secondary_color": "#c0392b",
+            "bg_color": "#1a1b2e",
+            "surface_color": "#232442",
+            "text_color": "#e2e4f0",
+            "text_secondary_color": "#9498b8",
+            "border_color": "#2e3055",
+            "user_msg_text_color": "#ffffff",
+            "bot_msg_bg_color": "#232442",
+            "bot_msg_text_color": "#e2e4f0",
+            "input_bg_color": "#232442",
+            "input_text_color": "#e2e4f0",
+            "input_placeholder_color": "#6b70a0",
+            "is_dark": True
+        })
+        mock_llm_instance.invoke.return_value = mock_response
+        mock_llm_class.return_value = mock_llm_instance
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(primary_color="#667eea", secondary_color="#764ba2")
+        theme_colors = {
+            'primary_color': '#667eea',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        generator.recolor_config(current_config, theme_colors)
+
+        # Verify Gemini was called and the prompt contains current colors
+        call_args = mock_llm_instance.invoke.call_args[0][0]
+        assert "#667eea" in call_args
+        assert "#764ba2" in call_args
+
+
+# ============================================================
+# Recolor API Endpoint Tests
+# ============================================================
+
+class TestRecolorAPIEndpoint:
+    """Tests for the /widget/recolor endpoint."""
+
+    def setup_method(self):
+        try:
+            from main import app
+            self.client = TestClient(app)
+            self.available = True
+        except ImportError:
+            self.available = False
+
+    def _skip_if_unavailable(self):
+        if not self.available:
+            pytest.skip("Full app dependencies not available (crawl4ai, etc.)")
+
+    def test_recolor_endpoint_returns_new_config_and_code(self):
+        """Should return new config and code with different colors."""
+        self._skip_if_unavailable()
+        from widget_customizer import WidgetConfig
+
+        with patch('main.ThemeExtractor') as mock_extractor_class, \
+             patch('main.WidgetConfigGenerator') as mock_generator_class, \
+             patch('main.WidgetCodeRenderer') as mock_renderer_class:
+
+            mock_extractor = MagicMock()
+            mock_extractor.extract_theme.return_value = {
+                'primary_color': '#667eea',
+                'background_color': '#0f1029',
+                'text_color': '#e2e4f0',
+                'accent_color': '#667eea',
+                'is_dark': True
+            }
+            mock_extractor_class.return_value = mock_extractor
+
+            new_config = WidgetConfig(
+                primary_color="#e74c3c",
+                secondary_color="#c0392b",
+            )
+            mock_generator = MagicMock()
+            mock_generator.recolor_config.return_value = new_config
+            mock_generator_class.return_value = mock_generator
+
+            mock_renderer = MagicMock()
+            mock_renderer.render.return_value = "<script>// recolored widget</script>"
+            mock_renderer_class.return_value = mock_renderer
+
+            response = self.client.post("/widget/recolor", json={
+                "config": WidgetConfig().model_dump(),
+                "url": "https://example.com",
+                "namespace": "example",
+                "api_base": "https://api.example.com"
+            })
+
+            assert response.status_code == 200
+            data = response.json()
+            assert 'code' in data
+            assert 'config' in data
+            assert data['config']['primary_color'] == "#e74c3c"
+
+    def test_recolor_endpoint_calls_theme_extractor(self):
+        """Should extract theme from the provided URL."""
+        self._skip_if_unavailable()
+        from widget_customizer import WidgetConfig
+
+        with patch('main.ThemeExtractor') as mock_extractor_class, \
+             patch('main.WidgetConfigGenerator') as mock_generator_class, \
+             patch('main.WidgetCodeRenderer') as mock_renderer_class:
+
+            mock_extractor = MagicMock()
+            mock_extractor.extract_theme.return_value = {
+                'primary_color': '#667eea',
+                'background_color': '#0f1029',
+                'text_color': '#e2e4f0',
+                'accent_color': '#667eea',
+                'is_dark': True
+            }
+            mock_extractor_class.return_value = mock_extractor
+
+            mock_generator = MagicMock()
+            mock_generator.recolor_config.return_value = WidgetConfig()
+            mock_generator_class.return_value = mock_generator
+
+            mock_renderer = MagicMock()
+            mock_renderer.render.return_value = "<script>// widget</script>"
+            mock_renderer_class.return_value = mock_renderer
+
+            self.client.post("/widget/recolor", json={
+                "config": WidgetConfig().model_dump(),
+                "url": "https://mysite.com",
+                "namespace": "mysite",
+                "api_base": "https://api.example.com"
+            })
+
+            mock_extractor.extract_theme.assert_called_once_with("https://mysite.com")
+
+
+# ============================================================
+# Recolor Integration Tests (Require GOOGLE_API_KEY)
+# ============================================================
+
+@pytest.mark.integration
+class TestRecolorIntegration:
+    """
+    Integration tests for recolor that call real Gemini API.
+
+    Run with: pytest -m integration tests/test_widget_customizer.py
+    Requires: GOOGLE_API_KEY environment variable
+    """
+
+    @pytest.fixture(autouse=True)
+    def check_api_key(self):
+        """Skip if no API key is available."""
+        if not os.environ.get('GOOGLE_API_KEY'):
+            pytest.skip("GOOGLE_API_KEY not set - skipping integration tests")
+
+    def test_gemini_recolor_produces_different_colors(self):
+        """Gemini should produce a different color scheme than the current one."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(
+            primary_color="#667eea",
+            secondary_color="#764ba2",
+        )
+        theme_colors = {
+            'primary_color': '#667eea',
+            'secondary_color': '#764ba2',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        new_config = generator.recolor_config(current_config, theme_colors)
+
+        assert isinstance(new_config, WidgetConfig)
+        # At least one of the main colors should be different
+        colors_changed = (
+            new_config.primary_color != current_config.primary_color or
+            new_config.secondary_color != current_config.secondary_color
+        )
+        assert colors_changed, (
+            f"Colors should have changed: "
+            f"primary {current_config.primary_color} -> {new_config.primary_color}, "
+            f"secondary {current_config.secondary_color} -> {new_config.secondary_color}"
+        )
+
+    def test_gemini_recolor_preserves_non_color_fields(self):
+        """Gemini recolor should not change text, shape, or icon settings."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig(
+            button_text="Ask Us!",
+            button_shape="circle",
+            button_icon="robot",
+            header_title="Help Center",
+        )
+        theme_colors = {
+            'primary_color': '#667eea',
+            'secondary_color': '#764ba2',
+            'background_color': '#0f1029',
+            'text_color': '#e2e4f0',
+            'accent_color': '#667eea',
+            'is_dark': True
+        }
+        new_config = generator.recolor_config(current_config, theme_colors)
+
+        assert new_config.button_text == "Ask Us!"
+        assert new_config.button_shape == "circle"
+        assert new_config.button_icon == "robot"
+        assert new_config.header_title == "Help Center"
+
+    def test_gemini_recolor_returns_valid_hex_colors(self):
+        """Recolored config should have valid hex color codes."""
+        from widget_customizer import WidgetConfigGenerator, WidgetConfig
+
+        generator = WidgetConfigGenerator()
+        current_config = WidgetConfig()
+        theme_colors = {
+            'primary_color': '#4285f4',
+            'secondary_color': '#34a853',
+            'background_color': '#ffffff',
+            'text_color': '#333333',
+            'accent_color': '#4285f4',
+            'is_dark': False
+        }
+        new_config = generator.recolor_config(current_config, theme_colors)
+
+        hex_pattern = re.compile(r'^#[0-9a-fA-F]{6}$')
+        assert hex_pattern.match(new_config.primary_color)
+        assert hex_pattern.match(new_config.secondary_color)
+        assert hex_pattern.match(new_config.bg_color)
+        assert hex_pattern.match(new_config.bot_msg_bg_color)

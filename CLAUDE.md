@@ -64,6 +64,10 @@ RAG-based chatbot system: crawl websites → chunk & index into vector DB → an
 - Integration tests requiring external APIs are marked with `@pytest.mark.integration`.
 - Cloud logging outputs JSON only (no pretty-print) for Google Cloud Logging compatibility.
 
+## Documentation
+
+- When a significant new feature or functionality is added, update `README.md` to reflect it (e.g., new sections, updated feature lists, usage instructions).
+
 ## Deployment
 
 Docker image uses `mcr.microsoft.com/playwright/python:v1.57.0-jammy` base (Playwright pre-installed). CI/CD via GitHub Actions (`.github/workflows/deploy.yml`): test → build → deploy to Cloud Run on port 8080.
