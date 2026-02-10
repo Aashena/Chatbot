@@ -351,6 +351,46 @@ button_shape MUST be one of: "pill", "circle", "rounded-square"
 button_icon MUST be one of: "chat", "robot", "help", "headset", "sparkle"
 """)
 
+RECOLOR_PROMPT = ChatPromptTemplate.from_template("""You are a UI theme expert. Generate a NEW, DIFFERENT color scheme for a chat widget that still harmonizes with the given website's color palette.
+
+Website theme colors extracted:
+- Background: {background_color}
+- Text: {text_color}
+- Accent/Brand: {accent_color}
+- Primary: {primary_color}
+- Secondary: {secondary_color}
+- Is Dark Theme: {is_dark}
+
+Current widget color scheme (you MUST produce DIFFERENT colors from these):
+{current_colors}
+
+Generate a completely NEW color combination that:
+1. Is visually DIFFERENT from the current colors above (use different hues/tones)
+2. Still harmonizes with the website's theme palette
+3. Maintains good contrast and readability
+4. Keeps the same dark/light mode as the current widget
+
+Return ONLY a valid JSON object with exactly these fields (no extra text):
+{{
+  "primary_color": "#hex",
+  "secondary_color": "#hex",
+  "bg_color": "#hex",
+  "surface_color": "#hex",
+  "text_color": "#hex",
+  "text_secondary_color": "#hex",
+  "border_color": "#hex",
+  "user_msg_text_color": "#hex",
+  "bot_msg_bg_color": "#hex",
+  "bot_msg_text_color": "#hex",
+  "input_bg_color": "#hex",
+  "input_text_color": "#hex",
+  "input_placeholder_color": "#hex",
+  "is_dark": true/false
+}}
+
+All color values MUST be 6-digit hex codes (e.g. #667eea).
+""")
+
 CUSTOMIZATION_PROMPT = ChatPromptTemplate.from_template("""You are a chat widget customization expert. Modify the widget configuration based on the user's request.
 
 Current widget configuration:
@@ -399,6 +439,56 @@ class WidgetConfigGenerator:
         except Exception as e:
             logging.error(f"Gemini theme generation failed: {e}")
             return self._config_from_theme_colors(theme_colors)
+
+    def recolor_config(self, current_config: WidgetConfig, theme_colors: Dict) -> WidgetConfig:
+        """Generate a new color scheme while preserving non-color properties."""
+        color_fields = [
+            'primary_color', 'secondary_color', 'bg_color', 'surface_color',
+            'text_color', 'text_secondary_color', 'border_color',
+            'user_msg_text_color', 'bot_msg_bg_color', 'bot_msg_text_color',
+            'input_bg_color', 'input_text_color', 'input_placeholder_color',
+            'is_dark',
+        ]
+        current_colors = {k: getattr(current_config, k) for k in color_fields}
+
+        try:
+            prompt_text = RECOLOR_PROMPT.format(
+                background_color=theme_colors.get('background_color', '#ffffff'),
+                text_color=theme_colors.get('text_color', '#333333'),
+                accent_color=theme_colors.get('accent_color', '#667eea'),
+                primary_color=theme_colors.get('primary_color', '#667eea'),
+                secondary_color=theme_colors.get('secondary_color', '#764ba2'),
+                is_dark=theme_colors.get('is_dark', False),
+                current_colors=json.dumps(current_colors, indent=2),
+            )
+            response = self.llm.invoke(prompt_text)
+            new_color_data = self._parse_color_response(response.content)
+
+            # Merge: keep non-color properties from current config, apply new colors
+            merged = current_config.model_dump()
+            merged.update(new_color_data)
+            return WidgetConfig(**merged)
+        except Exception as e:
+            logging.error(f"Gemini recolor failed: {e}")
+            return current_config
+
+    def _parse_color_response(self, content: str) -> dict:
+        """Parse Gemini's color-only JSON response."""
+        cleaned = content.strip()
+        if cleaned.startswith('```'):
+            cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
+            cleaned = re.sub(r'\s*```$', '', cleaned)
+
+        data = json.loads(cleaned)
+
+        color_fields = [
+            'primary_color', 'secondary_color', 'bg_color', 'surface_color',
+            'text_color', 'text_secondary_color', 'border_color',
+            'user_msg_text_color', 'bot_msg_bg_color', 'bot_msg_text_color',
+            'input_bg_color', 'input_text_color', 'input_placeholder_color',
+            'is_dark',
+        ]
+        return {k: data[k] for k in color_fields if k in data}
 
     def customize_config(self, current_config: WidgetConfig, instruction: str) -> WidgetConfig:
         """Customize an existing config based on a user instruction."""

@@ -328,6 +328,12 @@ class WidgetCustomizeRequest(BaseModel):
     namespace: str
     api_base: str
 
+class WidgetRecolorRequest(BaseModel):
+    config: Dict
+    url: str
+    namespace: str
+    api_base: str
+
 @app.post("/widget/generate/stream")
 async def widget_generate_stream(request: WidgetGenerateRequest):
     """
@@ -405,6 +411,29 @@ def widget_customize(request: WidgetCustomizeRequest):
     except Exception as e:
         logging.error(f"Error in widget customization: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Customization error: {str(e)}")
+
+@app.post("/widget/recolor")
+def widget_recolor(request: WidgetRecolorRequest):
+    """Generate a new color scheme for an existing widget, compatible with the website theme."""
+    try:
+        current_config = WidgetConfig(**request.config)
+
+        extractor = ThemeExtractor()
+        theme_colors = extractor.extract_theme(request.url)
+
+        generator = WidgetConfigGenerator()
+        new_config = generator.recolor_config(current_config, theme_colors)
+
+        renderer = WidgetCodeRenderer()
+        code = renderer.render(new_config, request.namespace, request.api_base)
+
+        return {
+            "code": code,
+            "config": new_config.model_dump(),
+        }
+    except Exception as e:
+        logging.error(f"Error in widget recolor: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Recolor error: {str(e)}")
 
 
 # Health check endpoint

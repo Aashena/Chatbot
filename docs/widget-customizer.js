@@ -32,7 +32,9 @@ export class WidgetCustomizerModule {
     this.currentGuide = null;
     this.namespace = null;
     this.widgetApiBase = null;
+    this.websiteUrl = null;
     this.liveConversationHistory = [];
+    this.autoOpenTimer = null;
 
     // DOM elements
     this.elements = {
@@ -48,6 +50,7 @@ export class WidgetCustomizerModule {
       customShape: document.getElementById('custom-widget-shape'),
       customIcon: document.getElementById('custom-widget-icon'),
       applyAllBtn: document.getElementById('apply-all-btn'),
+      recolorBtn: document.getElementById('recolor-btn'),
       // Modals
       codeModal: document.getElementById('code-modal'),
       codeModalClose: document.getElementById('code-modal-close'),
@@ -102,6 +105,11 @@ export class WidgetCustomizerModule {
       this.elements.applyAllBtn.addEventListener('click', () => this.applyAllCustomizations());
     }
 
+    // Recolor button
+    if (this.elements.recolorBtn) {
+      this.elements.recolorBtn.addEventListener('click', () => this.recolorWidget());
+    }
+
     // Enter key on any customization input
     const inputs = [this.elements.customText, this.elements.customShape, this.elements.customIcon];
     inputs.forEach(input => {
@@ -120,6 +128,7 @@ export class WidgetCustomizerModule {
   async startGeneration(url, namespace, apiBase) {
     this.namespace = namespace;
     this.widgetApiBase = apiBase;
+    this.websiteUrl = url;
 
     if (this.elements.section) {
       this.elements.section.classList.remove('hidden');
@@ -407,6 +416,21 @@ export class WidgetCustomizerModule {
       @media (max-width: 480px) {
         #live-cw-win { width: calc(100% - 40px) !important; height: calc(100% - 120px) !important; }
       }
+      @keyframes liveCwBtnEntry {
+        0% { transform: translateY(0); }
+        15% { transform: translateY(-80px); }
+        30% { transform: translateY(0); }
+        42% { transform: translateY(-35px); }
+        55% { transform: translateY(0); }
+        65% { transform: translateY(-15px); }
+        75% { transform: translateY(0); }
+        83% { transform: translateY(-5px); }
+        90% { transform: translateY(0); }
+        100% { transform: translateY(0); }
+      }
+      #live-cw-btn.live-cw-bounce {
+        animation: liveCwBtnEntry 1.5s ease !important;
+      }
     `;
     document.head.appendChild(style);
 
@@ -424,6 +448,11 @@ export class WidgetCustomizerModule {
     btn.setAttribute('aria-label', 'Open chat');
     btn.innerHTML = buttonInnerHtml;
     document.body.appendChild(btn);
+    btn.classList.add('live-cw-bounce');
+    // Remove bounce class after animation completes so it doesn't replay on chat close
+    btn.addEventListener('animationend', () => {
+      btn.classList.remove('live-cw-bounce');
+    }, { once: true });
 
     // Create chat window
     const win = document.createElement('div');
@@ -448,6 +477,19 @@ export class WidgetCustomizerModule {
 
     // Wire up events
     this.wireLiveWidgetEvents(config);
+
+    // Auto-open chat window after bounce animation (1.5s) + settle time (1.5s)
+    if (this.autoOpenTimer) {
+      clearTimeout(this.autoOpenTimer);
+    }
+    this.autoOpenTimer = setTimeout(() => {
+      const liveBtn = document.getElementById('live-cw-btn');
+      const liveWin = document.getElementById('live-cw-win');
+      if (liveBtn && liveWin && !liveWin.classList.contains('live-cw-open')) {
+        liveBtn.click();
+      }
+      this.autoOpenTimer = null;
+    }, 3000);
   }
 
   wireLiveWidgetEvents(config) {
@@ -529,6 +571,10 @@ export class WidgetCustomizerModule {
     }
 
     btn.addEventListener('click', () => {
+      if (self.autoOpenTimer) {
+        clearTimeout(self.autoOpenTimer);
+        self.autoOpenTimer = null;
+      }
       win.classList.add('live-cw-open');
       btn.classList.add('live-cw-hide');
       if (!msgs.children.length) addWelcome();
@@ -553,6 +599,10 @@ export class WidgetCustomizerModule {
   }
 
   removeLiveWidget() {
+    if (this.autoOpenTimer) {
+      clearTimeout(this.autoOpenTimer);
+      this.autoOpenTimer = null;
+    }
     const style = document.getElementById('live-widget-style');
     const btn = document.getElementById('live-cw-btn');
     const win = document.getElementById('live-cw-win');
@@ -731,6 +781,55 @@ export class WidgetCustomizerModule {
       this.showError(`Customization failed: ${error.message}`);
     } finally {
       if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = false;
+    }
+  }
+
+  // ========================================
+  // Recolor Widget
+  // ========================================
+
+  async recolorWidget() {
+    if (!this.currentConfig) {
+      this.showError('No widget to recolor. Generate one first.');
+      return;
+    }
+
+    this.showThinking('Generating new color scheme...');
+    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${this.apiBase}/widget/recolor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: this.currentConfig,
+          url: this.websiteUrl,
+          namespace: this.namespace,
+          api_base: this.widgetApiBase,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error ${response.status}`);
+      }
+
+      const data = await response.json();
+      this.currentConfig = data.config;
+      this.currentCode = data.code;
+
+      this.renderLiveWidget(data.config);
+      this.updateCodeBlock(data.code);
+      this.updatePlaceholders(data.config);
+      this.hideThinking();
+
+      this.showSuccess('Widget colors updated!');
+    } catch (error) {
+      console.error('Recolor error:', error);
+      this.hideThinking();
+      this.showError(`Recolor failed: ${error.message}`);
+    } finally {
+      if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = false;
     }
   }
 

@@ -14,6 +14,7 @@ function loadChatWidget(customNamespace, apiBase) {
 
   let conversationHistory = [];
   let hasInitialHiBeenSent = false;
+  let autoOpenTimer = null;
   
   // Create widget styles with higher specificity
   const style = document.createElement('style');
@@ -276,6 +277,21 @@ function loadChatWidget(customNamespace, apiBase) {
         height: calc(100% - 120px) !important;
       }
     }
+    @keyframes chatBtnEntry {
+      0% { transform: translateY(0); }
+      15% { transform: translateY(-80px); }
+      30% { transform: translateY(0); }
+      42% { transform: translateY(-35px); }
+      55% { transform: translateY(0); }
+      65% { transform: translateY(-15px); }
+      75% { transform: translateY(0); }
+      83% { transform: translateY(-5px); }
+      90% { transform: translateY(0); }
+      100% { transform: translateY(0); }
+    }
+    #chat-widget-button.chat-bounce {
+      animation: chatBtnEntry 1.5s ease !important;
+    }
   `;
   document.head.appendChild(style);
 
@@ -285,6 +301,11 @@ function loadChatWidget(customNamespace, apiBase) {
   chatButton.setAttribute('aria-label', 'Open chat');
   chatButton.innerHTML = '<span>Virtual Assistant</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>';
   document.body.appendChild(chatButton);
+  chatButton.classList.add('chat-bounce');
+  // Remove bounce class after animation completes so it doesn't replay on chat close
+  chatButton.addEventListener('animationend', () => {
+    chatButton.classList.remove('chat-bounce');
+  }, { once: true });
 
   // Create chat window
   const chatWindow = document.createElement('div');
@@ -433,6 +454,10 @@ function loadChatWidget(customNamespace, apiBase) {
 
   // Event listeners
   chatButton.addEventListener('click', () => {
+    if (autoOpenTimer) {
+      clearTimeout(autoOpenTimer);
+      autoOpenTimer = null;
+    }
     chatWindow.classList.add('chat-open');
     chatButton.classList.add('chat-hidden');
     if (chatContent.children.length === 0) {
@@ -458,10 +483,11 @@ function loadChatWidget(customNamespace, apiBase) {
     if (e.key === 'Enter') sendMessage();
   });
 
-  // Auto-open the widget to show it's ready
-  setTimeout(() => {
+  // Auto-open after bounce animation (1.5s) + settle time (1.5s)
+  autoOpenTimer = setTimeout(() => {
     chatButton.click();
-  }, 500);
+    autoOpenTimer = null;
+  }, 3000);
 
   console.log(`Chat widget loaded successfully for namespace: ${customNamespace}`);
 }
