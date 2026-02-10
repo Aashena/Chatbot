@@ -180,13 +180,38 @@
       font-family: monospace;
     }
     
+    .crawl-inline-stats {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .crawl-inline-stats.show {
+      display: flex;
+    }
+
+    .inline-stat-label {
+      color: #9498b8;
+      font-weight: 600;
+    }
+
+    .inline-stat-value {
+      color: #667eea;
+      font-weight: 700;
+    }
+
+    .inline-stat-separator {
+      color: #2e3055;
+    }
+
     .stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 12px;
       margin-bottom: 20px;
     }
-    
+
     .stat-card {
       background: #232442;
       padding: 12px;
@@ -201,7 +226,7 @@
       margin-bottom: 4px;
       font-weight: 600;
     }
-    
+
     .stat-value {
       font-size: 24px;
       font-weight: 700;
@@ -614,28 +639,16 @@
       <div class="button-group">
         <button id="crawl-btn">Start Crawling</button>
         <button id="stop-btn" class="stop-btn">Stop Crawling</button>
-        <div id="crawl-thinking" class="thinking hidden">
-          <span>Crawling website...</span>
-          <div class="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
+        <div id="crawl-inline-stats" class="crawl-inline-stats">
+          <span class="inline-stat-label">Discovered:</span>
+          <span class="inline-stat-value" id="stat-discovered">0</span>
+          <span class="inline-stat-separator">|</span>
+          <span class="inline-stat-label">To Visit:</span>
+          <span class="inline-stat-value" id="stat-to-visit">0</span>
         </div>
       </div>
-      
+
       <div id="crawl-status" class="crawl-status"></div>
-      
-      <div class="stats" id="crawl-stats" style="display: none;">
-        <div class="stat-card">
-          <div class="stat-label">Discovered</div>
-          <div class="stat-value" id="stat-discovered">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">To Visit</div>
-          <div class="stat-value" id="stat-to-visit">0</div>
-        </div>
-      </div>
     </div>
     
     <!-- Step 2: Review URLs -->
@@ -794,6 +807,7 @@
     const addUrlBtn = document.getElementById('add-url-btn');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
+    const statDiscovered = document.getElementById('stat-discovered');
 
     // ========================================
     // Utility Functions
@@ -874,6 +888,14 @@
     }
 
     /**
+     * Update the discovered URL count to reflect the actual list
+     */
+    function updateUrlCount() {
+      const count = urlList.querySelectorAll('.url-item').length;
+      statDiscovered.textContent = count;
+    }
+
+    /**
      * Check if URL already exists in the list
      */
     function urlExists(newUrl) {
@@ -899,6 +921,7 @@
      */
     window.removeUrlItem = function(button) {
       button.parentElement.remove();
+      updateUrlCount();
     };
 
     /**
@@ -907,14 +930,15 @@
     function addUrlToList(url) {
       if (!urlExists(url)) {
         urlsList.push(url);
-        
+
         // Show URL section if hidden
         if (urlSection.classList.contains('hidden')) {
           urlSection.classList.remove('hidden');
         }
-        
+
         // Add to the list (at the top for latest URLs)
         urlList.insertBefore(createUrlItem(url), urlList.firstChild);
+        updateUrlCount();
       }
     }
 

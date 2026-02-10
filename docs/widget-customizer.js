@@ -34,6 +34,7 @@ export class WidgetCustomizerModule {
     this.widgetApiBase = null;
     this.websiteUrl = null;
     this.liveConversationHistory = [];
+    this.autoOpenTimer = null;
 
     // DOM elements
     this.elements = {
@@ -415,6 +416,21 @@ export class WidgetCustomizerModule {
       @media (max-width: 480px) {
         #live-cw-win { width: calc(100% - 40px) !important; height: calc(100% - 120px) !important; }
       }
+      @keyframes liveCwBtnEntry {
+        0% { transform: translateY(0); }
+        15% { transform: translateY(-80px); }
+        30% { transform: translateY(0); }
+        42% { transform: translateY(-35px); }
+        55% { transform: translateY(0); }
+        65% { transform: translateY(-15px); }
+        75% { transform: translateY(0); }
+        83% { transform: translateY(-5px); }
+        90% { transform: translateY(0); }
+        100% { transform: translateY(0); }
+      }
+      #live-cw-btn.live-cw-bounce {
+        animation: liveCwBtnEntry 1.5s ease !important;
+      }
     `;
     document.head.appendChild(style);
 
@@ -432,6 +448,11 @@ export class WidgetCustomizerModule {
     btn.setAttribute('aria-label', 'Open chat');
     btn.innerHTML = buttonInnerHtml;
     document.body.appendChild(btn);
+    btn.classList.add('live-cw-bounce');
+    // Remove bounce class after animation completes so it doesn't replay on chat close
+    btn.addEventListener('animationend', () => {
+      btn.classList.remove('live-cw-bounce');
+    }, { once: true });
 
     // Create chat window
     const win = document.createElement('div');
@@ -456,6 +477,19 @@ export class WidgetCustomizerModule {
 
     // Wire up events
     this.wireLiveWidgetEvents(config);
+
+    // Auto-open chat window after bounce animation (1.5s) + settle time (1.5s)
+    if (this.autoOpenTimer) {
+      clearTimeout(this.autoOpenTimer);
+    }
+    this.autoOpenTimer = setTimeout(() => {
+      const liveBtn = document.getElementById('live-cw-btn');
+      const liveWin = document.getElementById('live-cw-win');
+      if (liveBtn && liveWin && !liveWin.classList.contains('live-cw-open')) {
+        liveBtn.click();
+      }
+      this.autoOpenTimer = null;
+    }, 3000);
   }
 
   wireLiveWidgetEvents(config) {
@@ -537,6 +571,10 @@ export class WidgetCustomizerModule {
     }
 
     btn.addEventListener('click', () => {
+      if (self.autoOpenTimer) {
+        clearTimeout(self.autoOpenTimer);
+        self.autoOpenTimer = null;
+      }
       win.classList.add('live-cw-open');
       btn.classList.add('live-cw-hide');
       if (!msgs.children.length) addWelcome();
@@ -561,6 +599,10 @@ export class WidgetCustomizerModule {
   }
 
   removeLiveWidget() {
+    if (this.autoOpenTimer) {
+      clearTimeout(this.autoOpenTimer);
+      this.autoOpenTimer = null;
+    }
     const style = document.getElementById('live-widget-style');
     const btn = document.getElementById('live-cw-btn');
     const win = document.getElementById('live-cw-win');

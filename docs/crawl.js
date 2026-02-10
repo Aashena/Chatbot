@@ -26,9 +26,7 @@ export class CrawlModule {
         domainInput: document.getElementById('domain-input'),
         crawlBtn: document.getElementById('crawl-btn'),
         stopBtn: document.getElementById('stop-btn'),
-        crawlThinking: document.getElementById('crawl-thinking'),
-        crawlStats: document.getElementById('crawl-stats'),
-        statDiscovered: document.getElementById('stat-discovered'),
+        inlineStats: document.getElementById('crawl-inline-stats'),
         statToVisit: document.getElementById('stat-to-visit')
       };
       
@@ -58,7 +56,6 @@ export class CrawlModule {
      */
     resetState() {
       this.currentSessionId = null;
-      this.elements.statDiscovered.textContent = '0';
       this.elements.statToVisit.textContent = '0';
     }
     
@@ -68,8 +65,7 @@ export class CrawlModule {
     showCrawlStartUI() {
       this.elements.crawlBtn.disabled = true;
       this.elements.stopBtn.classList.add('show');
-      this.elements.crawlThinking.classList.remove('hidden');
-      this.elements.crawlStats.style.display = 'grid';
+      this.elements.inlineStats.classList.add('show');
     }
     
     /**
@@ -78,7 +74,6 @@ export class CrawlModule {
     showCrawlEndUI() {
       this.elements.crawlBtn.disabled = false;
       this.elements.stopBtn.classList.remove('show');
-      this.elements.crawlThinking.classList.add('hidden');
     }
     
     /**
@@ -117,17 +112,10 @@ export class CrawlModule {
           if (this.onUrlDiscovered) {
             this.onUrlDiscovered(data.url);
           }
-          this.elements.statDiscovered.textContent = data.total_discovered;
-          this.updateStatus(`Discovered ${data.total_discovered} URLs...`, 'info');
           break;
           
         case 'progress':
-          this.elements.statDiscovered.textContent = data.total_discovered;
           this.elements.statToVisit.textContent = data.to_visit;
-          this.updateStatus(
-            `Progress: ${data.total_discovered} discovered, ${data.to_visit} queued`,
-            'info'
-          );
           break;
         
         case 'stopped':
