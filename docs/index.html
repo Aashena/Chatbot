@@ -149,6 +149,10 @@
       display: none;
     }
 
+    .index-status {
+      margin-top: 20px;
+    }
+
     .crawl-status.show, .index-status.show {
       display: block;
     }
@@ -180,14 +184,14 @@
       font-family: monospace;
     }
     
-    .crawl-inline-stats {
+    .crawl-inline-stats, .index-inline-stats {
       display: none;
       align-items: center;
       gap: 6px;
       font-size: 13px;
     }
 
-    .crawl-inline-stats.show {
+    .crawl-inline-stats.show, .index-inline-stats.show {
       display: flex;
     }
 
@@ -203,6 +207,23 @@
 
     .inline-stat-separator {
       color: #2e3055;
+    }
+
+    .url-actions-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .index-action-group {
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .index-action-group.show {
+      display: flex;
     }
 
     .stats {
@@ -310,7 +331,7 @@
     }
     
     .add-url-btn {
-      margin-top: 12px;
+      margin-top: 0;
       background: #10b981;
     }
     
@@ -660,38 +681,26 @@
       </p>
       <div class="url-editor">
         <div class="url-list" id="url-list"></div>
-        <button class="add-url-btn" id="add-url-btn">+ Add URL</button>
-      </div>
-      
-      <div class="button-group" style="margin-top: 20px;">
-        <button id="process-btn">Process URLs</button>
-        <div id="index-thinking" class="thinking hidden">
-          <span>Processing and indexing...</span>
-          <div class="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div class="url-actions-row">
+          <div class="index-action-group">
+            <button class="add-url-btn" id="add-url-btn">+ Add URL</button>
+            <button id="process-btn">Process URLs</button>
           </div>
+          <div id="index-inline-stats" class="index-inline-stats">
+              <span class="inline-stat-label">Batch:</span>
+              <span class="inline-stat-value" id="stat-batch">0/0</span>
+              <span class="inline-stat-separator">|</span>
+              <span class="inline-stat-label">Processed:</span>
+              <span class="inline-stat-value" id="stat-urls-processed">0</span>
+              <span class="inline-stat-separator">|</span>
+              <span class="inline-stat-label">Chunks:</span>
+              <span class="inline-stat-value" id="stat-chunks">0</span>
+            </div>
         </div>
       </div>
-      
+
       <!-- Index progress section -->
       <div id="index-status" class="index-status"></div>
-      
-      <div class="stats" id="index-stats" style="display: none;">
-        <div class="stat-card">
-          <div class="stat-label">Batch</div>
-          <div class="stat-value" id="stat-batch">0/0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">URLs Processed</div>
-          <div class="stat-value" id="stat-urls-processed">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Chunks Indexed</div>
-          <div class="stat-value" id="stat-chunks">0</div>
-        </div>
-      </div>
     </div>
     
     <!-- Step 3: Widget Customizer -->
@@ -805,6 +814,7 @@
     const urlSection = document.getElementById('url-section');
     const urlList = document.getElementById('url-list');
     const addUrlBtn = document.getElementById('add-url-btn');
+    const indexActionGroup = document.querySelector('.index-action-group');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
     const statDiscovered = document.getElementById('stat-discovered');
@@ -1044,6 +1054,9 @@
           indexModule.setConfig(namespace, crawlModule.getConfig());
         }
 
+        // Show index action buttons now that crawling is done
+        indexActionGroup.classList.add('show');
+
         // Clear messages
         clearMessages();
 
@@ -1052,6 +1065,7 @@
       },
       onError: (error) => {
         console.error('Crawl error:', error);
+        indexActionGroup.classList.add('show');
       }
     });
 

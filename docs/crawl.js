@@ -282,7 +282,11 @@ export class CrawlModule {
         
         this.updateStatus(result.message, 'success');
         this.showCrawlEndUI();
-        
+
+        if (this.onComplete) {
+          this.onComplete({ stopped: true, totalUrls: result.total_discovered || 0 });
+        }
+
       } catch (error) {
         console.error('Error stopping crawl:', error);
         this.showError(`Error stopping: ${error.message}`);
