@@ -92,10 +92,11 @@ export class IndexModule {
         case 'start':
           this.elements.indexInlineStats.classList.add('show');
           this.updateStatus(
-            `Starting indexing of ${data.total_urls} URLs...`, 
-            'info', 
+            `Starting indexing of ${data.total_urls} URLs...`,
+            'info',
             'index-status'
           );
+          document.getElementById('index-status')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           break;
         
         case 'existing_check':
@@ -168,6 +169,7 @@ export class IndexModule {
           this.showSuccess(
             `✓ Successfully indexed ${data.urls_processed} URLs into ${data.total_chunks} chunks!`
           );
+          document.getElementById('index-status')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           
           if (this.onComplete) {
             this.onComplete({
