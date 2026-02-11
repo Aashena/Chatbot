@@ -347,7 +347,7 @@ async def widget_generate_stream(request: WidgetGenerateRequest):
             await asyncio.sleep(0)  # yield control
 
             extractor = ThemeExtractor()
-            theme_colors = extractor.extract_theme(request.url)
+            theme_colors = await extractor.extract_theme(request.url)
 
             yield f"data: {json.dumps({'type': 'theme', 'colors': theme_colors, 'message': 'Theme colors extracted'})}\n\n"
             await asyncio.sleep(0)
@@ -413,13 +413,13 @@ def widget_customize(request: WidgetCustomizeRequest):
         raise HTTPException(status_code=500, detail=f"Customization error: {str(e)}")
 
 @app.post("/widget/recolor")
-def widget_recolor(request: WidgetRecolorRequest):
+async def widget_recolor(request: WidgetRecolorRequest):
     """Generate a new color scheme for an existing widget, compatible with the website theme."""
     try:
         current_config = WidgetConfig(**request.config)
 
         extractor = ThemeExtractor()
-        theme_colors = extractor.extract_theme(request.url)
+        theme_colors = await extractor.extract_theme(request.url)
 
         generator = WidgetConfigGenerator()
         new_config = generator.recolor_config(current_config, theme_colors)

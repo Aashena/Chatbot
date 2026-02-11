@@ -13,13 +13,18 @@ Architecture:
 """
 
 import re
+import io
 import json
+import asyncio
 import logging
 from collections import Counter
 from urllib.parse import urlparse
 
 import requests
+import colorgram
+from PIL import Image
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
@@ -146,55 +151,163 @@ class WidgetConfig(BaseModel):
 # ============================================================
 
 class ThemeExtractor:
-    """Extracts color themes from website URLs."""
+    """Extracts color themes from website URLs using Playwright and colorgram."""
 
     HEX_COLOR = re.compile(r'#(?:[0-9a-fA-F]{3}){1,2}\b')
     RGB_COLOR = re.compile(r'rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+\s*)?\)')
 
-    def extract_theme(self, url: str) -> Dict:
-        """Fetch a URL and extract its color theme."""
+    async def extract_theme(self, url: str) -> Dict:
+        """Fetch a URL and extract its color theme.
+
+        Uses Playwright for JS-rendered pages with colorgram visual analysis.
+        Falls back to requests+BS4 if Playwright is unavailable.
+        """
+        if not url.startswith('http'):
+            url = f'https://{url}'
+
         try:
-            if not url.startswith('http'):
-                url = f'https://{url}'
-
-            headers = {'User-Agent': 'Mozilla/5.0 (compatible; ChatBotWidget/1.0)'}
-            response = requests.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-
-            soup = BeautifulSoup(response.text, 'html.parser')
-            colors = []
-
-            # Inline styles
-            for el in soup.find_all(style=True):
-                colors.extend(self._extract_colors_from_css(el.get('style', '')))
-
-            # <style> tags
-            for style_tag in soup.find_all('style'):
-                if style_tag.string:
-                    colors.extend(self._extract_colors_from_css(style_tag.string))
-
-            # Linked stylesheets (first 3)
-            for link in soup.find_all('link', rel='stylesheet')[:3]:
-                href = link.get('href', '')
-                if href:
-                    css_url = self._resolve_url(url, href)
-                    try:
-                        css_resp = requests.get(css_url, headers=headers, timeout=10)
-                        if css_resp.ok:
-                            colors.extend(self._extract_colors_from_css(css_resp.text))
-                    except Exception:
-                        pass
-
-            # Meta theme-color
-            meta_theme = soup.find('meta', attrs={'name': 'theme-color'})
-            if meta_theme and meta_theme.get('content'):
-                colors.append(('accent', meta_theme['content']))
-
-            return self._analyze_colors(colors, soup)
-
+            return await self._extract_with_playwright(url)
         except Exception as e:
-            logging.error(f"Error extracting theme from {url}: {e}")
-            return self._default_theme()
+            logging.warning(f"Playwright extraction failed for {url}: {e}, falling back to requests")
+            try:
+                return await asyncio.to_thread(self._extract_with_requests, url)
+            except Exception as e2:
+                logging.error(f"Fallback extraction also failed for {url}: {e2}")
+                return self._default_theme()
+
+    async def _extract_with_playwright(self, url: str) -> Dict:
+        """Extract theme using Playwright (handles dynamic/SPA sites)."""
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
+                page = await browser.new_page(
+                    user_agent='Mozilla/5.0 (compatible; ChatBotWidget/1.0)'
+                )
+                await page.goto(url, wait_until='networkidle', timeout=20000)
+
+                # 1. Screenshot -> colorgram dominant colors
+                screenshot_bytes = await page.screenshot(full_page=False)
+                dominant_colors = self._extract_dominant_colors(screenshot_bytes)
+
+                # 2. Computed styles from key elements
+                computed_styles = await page.evaluate('''() => {
+                    const selectors = {
+                        body: 'body',
+                        header: 'header, [role="banner"], .header',
+                        nav: 'nav, [role="navigation"], .nav, .navbar',
+                        main: 'main, [role="main"], .main-content, #content',
+                        button: 'button, .btn, [role="button"]',
+                        link: 'a'
+                    };
+                    const result = {};
+                    for (const [name, selector] of Object.entries(selectors)) {
+                        const el = document.querySelector(selector);
+                        if (el) {
+                            const s = window.getComputedStyle(el);
+                            result[name] = {
+                                backgroundColor: s.backgroundColor,
+                                color: s.color,
+                                borderColor: s.borderColor || ''
+                            };
+                        }
+                    }
+                    return result;
+                }''')
+
+                # 3. Collect all CSS rules from document.styleSheets
+                all_css_text = await page.evaluate('''() => {
+                    let css = '';
+                    try {
+                        for (const sheet of document.styleSheets) {
+                            try {
+                                for (const rule of sheet.cssRules) {
+                                    css += rule.cssText + '\\n';
+                                }
+                            } catch (e) { /* cross-origin sheet, skip */ }
+                        }
+                    } catch (e) {}
+                    return css;
+                }''')
+
+                # 4. Parse rendered HTML with BS4
+                rendered_html = await page.content()
+                soup = BeautifulSoup(rendered_html, 'html.parser')
+            finally:
+                await browser.close()
+
+        # Combine all CSS-based color extraction
+        colors = []
+        for el in soup.find_all(style=True):
+            colors.extend(self._extract_colors_from_css(el.get('style', '')))
+        for style_tag in soup.find_all('style'):
+            if style_tag.string:
+                colors.extend(self._extract_colors_from_css(style_tag.string))
+        if all_css_text:
+            colors.extend(self._extract_colors_from_css(all_css_text))
+
+        meta_theme = soup.find('meta', attrs={'name': 'theme-color'})
+        if meta_theme and meta_theme.get('content'):
+            colors.append(('accent', meta_theme['content']))
+
+        theme = self._analyze_colors(colors, soup)
+        theme['dominant_colors'] = dominant_colors
+        theme['computed_styles'] = computed_styles
+        return theme
+
+    def _extract_with_requests(self, url: str) -> Dict:
+        """Fallback: extract theme using requests + BS4 (no JS rendering)."""
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; ChatBotWidget/1.0)'}
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        colors = []
+
+        for el in soup.find_all(style=True):
+            colors.extend(self._extract_colors_from_css(el.get('style', '')))
+
+        for style_tag in soup.find_all('style'):
+            if style_tag.string:
+                colors.extend(self._extract_colors_from_css(style_tag.string))
+
+        for link in soup.find_all('link', rel='stylesheet')[:3]:
+            href = link.get('href', '')
+            if href:
+                css_url = self._resolve_url(url, href)
+                try:
+                    css_resp = requests.get(css_url, headers=headers, timeout=10)
+                    if css_resp.ok:
+                        colors.extend(self._extract_colors_from_css(css_resp.text))
+                except Exception:
+                    pass
+
+        meta_theme = soup.find('meta', attrs={'name': 'theme-color'})
+        if meta_theme and meta_theme.get('content'):
+            colors.append(('accent', meta_theme['content']))
+
+        theme = self._analyze_colors(colors, soup)
+        theme['dominant_colors'] = []
+        theme['computed_styles'] = {}
+        return theme
+
+    def _extract_dominant_colors(self, screenshot_bytes: bytes) -> List[Dict]:
+        """Extract dominant colors from a screenshot using colorgram.py."""
+        try:
+            image = Image.open(io.BytesIO(screenshot_bytes))
+            extracted = colorgram.extract(image, 8)
+            result = []
+            for color in extracted:
+                hex_color = '#{:02x}{:02x}{:02x}'.format(
+                    color.rgb.r, color.rgb.g, color.rgb.b
+                )
+                result.append({
+                    'color': hex_color,
+                    'proportion': round(color.proportion, 4),
+                })
+            return result
+        except Exception as e:
+            logging.warning(f"colorgram extraction failed: {e}")
+            return []
 
     def _extract_colors_from_css(self, css_text: str) -> List[Tuple[str, str]]:
         """Extract color values from CSS text with their property type."""
@@ -304,6 +417,8 @@ class ThemeExtractor:
             'primary_color': '#667eea',
             'secondary_color': '#764ba2',
             'is_dark': False,
+            'dominant_colors': [],
+            'computed_styles': {},
         }
 
 
@@ -313,7 +428,7 @@ class ThemeExtractor:
 
 THEME_GENERATION_PROMPT = ChatPromptTemplate.from_template("""You are a UI theme expert. Generate a chat widget color configuration that harmonizes with the given website color palette.
 
-Website colors extracted:
+Website colors extracted from CSS analysis:
 - Background: {background_color}
 - Text: {text_color}
 - Accent/Brand: {accent_color}
@@ -321,7 +436,13 @@ Website colors extracted:
 - Secondary: {secondary_color}
 - Is Dark Theme: {is_dark}
 
-Generate a harmonious widget theme. Use the website's accent/brand colors as the primary widget colors. Ensure good readability and contrast. If the website is dark-themed, make the widget dark too.
+Dominant colors from visual analysis (sorted by area proportion):
+{dominant_colors}
+
+Computed styles from key page elements:
+{computed_styles}
+
+Generate a harmonious widget theme. Use the website's accent/brand colors as the primary widget colors. Pay special attention to the dominant colors — these represent the actual visual appearance of the rendered page. Use the computed styles to understand the site's header, navigation, and button styling. Ensure good readability and contrast. If the website is dark-themed, make the widget dark too.
 
 Return ONLY a valid JSON object with exactly these fields (no extra text):
 {{
@@ -353,7 +474,7 @@ button_icon MUST be one of: "chat", "robot", "help", "headset", "sparkle"
 
 RECOLOR_PROMPT = ChatPromptTemplate.from_template("""You are a UI theme expert. Generate a NEW, DIFFERENT color scheme for a chat widget that still harmonizes with the given website's color palette.
 
-Website theme colors extracted:
+Website theme colors extracted from CSS analysis:
 - Background: {background_color}
 - Text: {text_color}
 - Accent/Brand: {accent_color}
@@ -361,12 +482,18 @@ Website theme colors extracted:
 - Secondary: {secondary_color}
 - Is Dark Theme: {is_dark}
 
+Dominant colors from visual analysis (sorted by area proportion):
+{dominant_colors}
+
+Computed styles from key page elements:
+{computed_styles}
+
 Current widget color scheme (you MUST produce DIFFERENT colors from these):
 {current_colors}
 
 Generate a completely NEW color combination that:
 1. Is visually DIFFERENT from the current colors above (use different hues/tones)
-2. Still harmonizes with the website's theme palette
+2. Still harmonizes with the website's theme palette, paying attention to the dominant colors and computed styles
 3. Maintains good contrast and readability
 4. Keeps the same dark/light mode as the current widget
 
@@ -433,6 +560,8 @@ class WidgetConfigGenerator:
                 primary_color=theme_colors.get('primary_color', '#667eea'),
                 secondary_color=theme_colors.get('secondary_color', '#764ba2'),
                 is_dark=theme_colors.get('is_dark', False),
+                dominant_colors=self._format_dominant_colors(theme_colors.get('dominant_colors', [])),
+                computed_styles=self._format_computed_styles(theme_colors.get('computed_styles', {})),
             )
             response = self.llm.invoke(prompt_text)
             return self._parse_config_response(response.content)
@@ -459,6 +588,8 @@ class WidgetConfigGenerator:
                 primary_color=theme_colors.get('primary_color', '#667eea'),
                 secondary_color=theme_colors.get('secondary_color', '#764ba2'),
                 is_dark=theme_colors.get('is_dark', False),
+                dominant_colors=self._format_dominant_colors(theme_colors.get('dominant_colors', [])),
+                computed_styles=self._format_computed_styles(theme_colors.get('computed_styles', {})),
                 current_colors=json.dumps(current_colors, indent=2),
             )
             response = self.llm.invoke(prompt_text)
@@ -471,6 +602,27 @@ class WidgetConfigGenerator:
         except Exception as e:
             logging.error(f"Gemini recolor failed: {e}")
             return current_config
+
+    def _format_dominant_colors(self, colors: list) -> str:
+        """Format dominant colors list for the Gemini prompt."""
+        if not colors:
+            return "No visual analysis data available"
+        lines = []
+        for c in colors:
+            pct = c['proportion'] * 100
+            lines.append(f"  {c['color']} ({pct:.1f}% of page)")
+        return '\n'.join(lines)
+
+    def _format_computed_styles(self, styles: dict) -> str:
+        """Format computed styles dict for the Gemini prompt."""
+        if not styles:
+            return "No computed style data available"
+        lines = []
+        for element, props in styles.items():
+            bg = props.get('backgroundColor', 'N/A')
+            fg = props.get('color', 'N/A')
+            lines.append(f"  {element}: background={bg}, text={fg}")
+        return '\n'.join(lines)
 
     def _parse_color_response(self, content: str) -> dict:
         """Parse Gemini's color-only JSON response."""
