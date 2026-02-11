@@ -46,6 +46,10 @@
       margin-bottom: 30px;
     }
     
+    .hidden {
+      display: none;
+    }
+
     .section.hidden {
       display: none;
     }
@@ -149,6 +153,10 @@
       display: none;
     }
 
+    .index-status {
+      margin-top: 20px;
+    }
+
     .crawl-status.show, .index-status.show {
       display: block;
     }
@@ -180,14 +188,14 @@
       font-family: monospace;
     }
     
-    .crawl-inline-stats {
+    .crawl-inline-stats, .index-inline-stats {
       display: none;
       align-items: center;
       gap: 6px;
       font-size: 13px;
     }
 
-    .crawl-inline-stats.show {
+    .crawl-inline-stats.show, .index-inline-stats.show {
       display: flex;
     }
 
@@ -203,6 +211,23 @@
 
     .inline-stat-separator {
       color: #2e3055;
+    }
+
+    .url-actions-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .index-action-group {
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .index-action-group.show {
+      display: flex;
     }
 
     .stats {
@@ -310,7 +335,7 @@
     }
     
     .add-url-btn {
-      margin-top: 12px;
+      margin-top: 0;
       background: #10b981;
     }
     
@@ -394,6 +419,94 @@
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
+    }
+
+    /* Extracted theme preview */
+    .theme-preview {
+      margin-top: 20px;
+      padding: 16px 20px;
+      background: #1a1b2e;
+      border: 1px solid #2e3055;
+      border-radius: 10px;
+    }
+
+    .theme-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .theme-preview-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #9498b8;
+      letter-spacing: 0.5px;
+    }
+
+    .theme-preview-mode {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .theme-preview-mode.dark {
+      background: #232442;
+      color: #9498b8;
+      border: 1px solid #2e3055;
+    }
+
+    .theme-preview-mode.light {
+      background: #fef9c3;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .theme-swatches {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .theme-swatch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px 6px 6px;
+      background: #232442;
+      border-radius: 8px;
+      border: 1px solid #2e3055;
+    }
+
+    .theme-swatch-color {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      flex-shrink: 0;
+    }
+
+    .theme-swatch-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .theme-swatch-label {
+      font-size: 10px;
+      color: #6b70a0;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .theme-swatch-value {
+      font-size: 11px;
+      color: #9498b8;
+      font-family: 'SF Mono', 'Fira Code', monospace;
     }
 
     /* Step 3: Widget Customizer Styles */
@@ -660,38 +773,26 @@
       </p>
       <div class="url-editor">
         <div class="url-list" id="url-list"></div>
-        <button class="add-url-btn" id="add-url-btn">+ Add URL</button>
-      </div>
-      
-      <div class="button-group" style="margin-top: 20px;">
-        <button id="process-btn">Process URLs</button>
-        <div id="index-thinking" class="thinking hidden">
-          <span>Processing and indexing...</span>
-          <div class="thinking-dots">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div class="url-actions-row">
+          <div class="index-action-group">
+            <button class="add-url-btn" id="add-url-btn">+ Add URL</button>
+            <button id="process-btn">Process URLs</button>
           </div>
+          <div id="index-inline-stats" class="index-inline-stats">
+              <span class="inline-stat-label">Batch:</span>
+              <span class="inline-stat-value" id="stat-batch">0/0</span>
+              <span class="inline-stat-separator">|</span>
+              <span class="inline-stat-label">Processed:</span>
+              <span class="inline-stat-value" id="stat-urls-processed">0</span>
+              <span class="inline-stat-separator">|</span>
+              <span class="inline-stat-label">Chunks:</span>
+              <span class="inline-stat-value" id="stat-chunks">0</span>
+            </div>
         </div>
       </div>
-      
+
       <!-- Index progress section -->
       <div id="index-status" class="index-status"></div>
-      
-      <div class="stats" id="index-stats" style="display: none;">
-        <div class="stat-card">
-          <div class="stat-label">Batch</div>
-          <div class="stat-value" id="stat-batch">0/0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">URLs Processed</div>
-          <div class="stat-value" id="stat-urls-processed">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Chunks Indexed</div>
-          <div class="stat-value" id="stat-chunks">0</div>
-        </div>
-      </div>
     </div>
     
     <!-- Step 3: Widget Customizer -->
@@ -710,6 +811,15 @@
           <span></span>
           <span></span>
         </div>
+      </div>
+
+      <!-- Extracted Theme Preview -->
+      <div id="theme-preview" class="theme-preview hidden">
+        <div class="theme-preview-header">
+          <span class="theme-preview-title">Extracted Website Colors</span>
+          <span id="theme-mode-badge" class="theme-preview-mode dark">Dark</span>
+        </div>
+        <div id="theme-swatches" class="theme-swatches"></div>
       </div>
 
       <!-- Customization Section -->
@@ -805,6 +915,7 @@
     const urlSection = document.getElementById('url-section');
     const urlList = document.getElementById('url-list');
     const addUrlBtn = document.getElementById('add-url-btn');
+    const indexActionGroup = document.querySelector('.index-action-group');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
     const statDiscovered = document.getElementById('stat-discovered');
@@ -837,6 +948,7 @@
       errorMessage.textContent = message;
       errorMessage.classList.add('show');
       successMessage.classList.remove('show');
+      errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       setTimeout(() => errorMessage.classList.remove('show'), 5000);
     }
 
@@ -847,6 +959,7 @@
       successMessage.textContent = message;
       successMessage.classList.add('show');
       errorMessage.classList.remove('show');
+      successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     /**
@@ -934,6 +1047,7 @@
         // Show URL section if hidden
         if (urlSection.classList.contains('hidden')) {
           urlSection.classList.remove('hidden');
+          urlSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         // Add to the list (at the top for latest URLs)
@@ -1044,14 +1158,18 @@
           indexModule.setConfig(namespace, crawlModule.getConfig());
         }
 
+        // Show index action buttons now that crawling is done
+        indexActionGroup.classList.add('show');
+
         // Clear messages
         clearMessages();
 
         // Scroll to URL section
-        urlSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        urlSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       },
       onError: (error) => {
         console.error('Crawl error:', error);
+        indexActionGroup.classList.add('show');
       }
     });
 

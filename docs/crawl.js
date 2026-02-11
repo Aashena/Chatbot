@@ -150,8 +150,10 @@ export class CrawlModule {
      * Start crawling with streaming
      */
     async startCrawl() {
-      const domain = this.elements.domainInput.value.trim();
-      
+      let domain = this.elements.domainInput.value.trim()
+        .replace(/^https?:\/\//, '');
+      this.elements.domainInput.value = domain;
+
       if (!domain) {
         this.showError('Please enter a domain name');
         return null;
@@ -282,7 +284,11 @@ export class CrawlModule {
         
         this.updateStatus(result.message, 'success');
         this.showCrawlEndUI();
-        
+
+        if (this.onComplete) {
+          this.onComplete({ stopped: true, totalUrls: result.total_discovered || 0 });
+        }
+
       } catch (error) {
         console.error('Error stopping crawl:', error);
         this.showError(`Error stopping: ${error.message}`);

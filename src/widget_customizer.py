@@ -414,7 +414,7 @@ Return ONLY the modified JSON configuration (no extra text, no markdown):
 class WidgetConfigGenerator:
     """Uses Gemini to generate and customize widget configurations."""
 
-    GEMINI_MODEL = 'gemini-2.0-flash'
+    GEMINI_MODEL = 'gemini-2.5-flash-lite'
 
     def __init__(self):
         self.llm = ChatGoogleGenerativeAI(

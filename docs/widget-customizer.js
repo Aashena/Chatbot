@@ -33,6 +33,7 @@ export class WidgetCustomizerModule {
     this.namespace = null;
     this.widgetApiBase = null;
     this.websiteUrl = null;
+    this.extractedTheme = null;
     this.liveConversationHistory = [];
     this.autoOpenTimer = null;
 
@@ -132,8 +133,15 @@ export class WidgetCustomizerModule {
 
     if (this.elements.section) {
       this.elements.section.classList.remove('hidden');
-      this.elements.section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      this.elements.section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+
+    // Hide customization UI and theme preview until widget is first rendered
+    const customSection = document.getElementById('customization-section');
+    if (customSection) customSection.classList.add('hidden');
+    if (this.elements.actionsSection) this.elements.actionsSection.classList.add('hidden');
+    const themePreview = document.getElementById('theme-preview');
+    if (themePreview) themePreview.classList.add('hidden');
 
     this.showThinking('Analyzing website theme...');
 
@@ -191,6 +199,8 @@ export class WidgetCustomizerModule {
         break;
 
       case 'theme':
+        this.extractedTheme = data.colors;
+        this.renderThemePreview(data.colors);
         this.showThinking('Theme colors extracted, generating widget...');
         break;
 
@@ -211,6 +221,9 @@ export class WidgetCustomizerModule {
         this.showActionButtons();
         this.updatePlaceholders(data.config);
         this.showSuccess('Widget generated! Try it out using the floating button, or customize it further.');
+        if (this.elements.actionsSection) {
+          this.elements.actionsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
         break;
 
       case 'error':
@@ -218,6 +231,43 @@ export class WidgetCustomizerModule {
         this.showError(`Widget generation error: ${data.message}`);
         break;
     }
+  }
+
+  // ========================================
+  // Extracted Theme Preview
+  // ========================================
+
+  renderThemePreview(colors) {
+    const container = document.getElementById('theme-preview');
+    const swatchesEl = document.getElementById('theme-swatches');
+    const modeBadge = document.getElementById('theme-mode-badge');
+    if (!container || !swatchesEl) return;
+
+    const swatches = [
+      { label: 'Background', color: colors.background_color },
+      { label: 'Text', color: colors.text_color },
+      { label: 'Accent', color: colors.accent_color },
+      { label: 'Primary', color: colors.primary_color },
+      { label: 'Secondary', color: colors.secondary_color },
+    ];
+
+    swatchesEl.innerHTML = swatches.map(s => `
+      <div class="theme-swatch">
+        <div class="theme-swatch-color" style="background: ${this.escapeHtml(s.color)};"></div>
+        <div class="theme-swatch-info">
+          <span class="theme-swatch-label">${s.label}</span>
+          <span class="theme-swatch-value">${this.escapeHtml(s.color)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    if (modeBadge) {
+      const isDark = colors.is_dark;
+      modeBadge.textContent = isDark ? 'Dark' : 'Light';
+      modeBadge.className = `theme-preview-mode ${isDark ? 'dark' : 'light'}`;
+    }
+
+    container.classList.remove('hidden');
   }
 
   // ========================================
@@ -741,7 +791,7 @@ export class WidgetCustomizerModule {
     const instruction = parts.join('. ') + '.';
 
     this.showThinking('Applying customizations...');
-    if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = true;
+    this.setCustomizationButtonsEnabled(false);
 
     try {
       const response = await fetch(`${this.apiBase}/widget/customize`, {
@@ -780,7 +830,7 @@ export class WidgetCustomizerModule {
       this.hideThinking();
       this.showError(`Customization failed: ${error.message}`);
     } finally {
-      if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = false;
+      this.setCustomizationButtonsEnabled(true);
     }
   }
 
@@ -795,7 +845,7 @@ export class WidgetCustomizerModule {
     }
 
     this.showThinking('Generating new color scheme...');
-    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = true;
+    this.setCustomizationButtonsEnabled(false);
 
     try {
       const response = await fetch(`${this.apiBase}/widget/recolor`, {
@@ -829,7 +879,7 @@ export class WidgetCustomizerModule {
       this.hideThinking();
       this.showError(`Recolor failed: ${error.message}`);
     } finally {
-      if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = false;
+      this.setCustomizationButtonsEnabled(true);
     }
   }
 
@@ -850,6 +900,11 @@ export class WidgetCustomizerModule {
     if (this.elements.widgetThinking) {
       this.elements.widgetThinking.classList.add('hidden');
     }
+  }
+
+  setCustomizationButtonsEnabled(enabled) {
+    if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = !enabled;
+    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = !enabled;
   }
 
   // ========================================

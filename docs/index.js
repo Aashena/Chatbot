@@ -24,8 +24,7 @@ export class IndexModule {
       // DOM elements
       this.elements = {
         processBtn: document.getElementById('process-btn'),
-        indexThinking: document.getElementById('index-thinking'),
-        indexStats: document.getElementById('index-stats'),
+        indexInlineStats: document.getElementById('index-inline-stats'),
         statBatch: document.getElementById('stat-batch'),
         statUrlsProcessed: document.getElementById('stat-urls-processed'),
         statChunks: document.getElementById('stat-chunks')
@@ -66,8 +65,7 @@ export class IndexModule {
      */
     showIndexStartUI() {
       this.elements.processBtn.disabled = true;
-      this.elements.indexThinking.classList.remove('hidden');
-      this.elements.indexStats.style.display = 'grid';
+      this.elements.indexInlineStats.classList.add('show');
     }
     
     /**
@@ -75,7 +73,6 @@ export class IndexModule {
      */
     showIndexEndUI() {
       this.elements.processBtn.disabled = false;
-      this.elements.indexThinking.classList.add('hidden');
     }
     
     /**
@@ -93,12 +90,13 @@ export class IndexModule {
       
       switch (data.type) {
         case 'start':
-          this.elements.indexStats.style.display = 'grid';
+          this.elements.indexInlineStats.classList.add('show');
           this.updateStatus(
-            `Starting indexing of ${data.total_urls} URLs...`, 
-            'info', 
+            `Starting indexing of ${data.total_urls} URLs...`,
+            'info',
             'index-status'
           );
+          document.getElementById('index-status')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           break;
         
         case 'existing_check':
@@ -171,6 +169,7 @@ export class IndexModule {
           this.showSuccess(
             `✓ Successfully indexed ${data.urls_processed} URLs into ${data.total_chunks} chunks!`
           );
+          document.getElementById('index-status')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           
           if (this.onComplete) {
             this.onComplete({
@@ -302,7 +301,6 @@ export class IndexModule {
      * Check if indexing is currently active
      */
     isActive() {
-      return !this.elements.processBtn.disabled && 
-             !this.elements.indexThinking.classList.contains('hidden');
+      return this.elements.processBtn.disabled;
     }
   }
