@@ -150,8 +150,10 @@ export class CrawlModule {
      * Start crawling with streaming
      */
     async startCrawl() {
-      const domain = this.elements.domainInput.value.trim();
-      
+      let domain = this.elements.domainInput.value.trim()
+        .replace(/^https?:\/\//, '');
+      this.elements.domainInput.value = domain;
+
       if (!domain) {
         this.showError('Please enter a domain name');
         return null;
