@@ -135,6 +135,11 @@ export class WidgetCustomizerModule {
       this.elements.section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
+    // Hide customization UI until widget is first rendered
+    const customSection = document.getElementById('customization-section');
+    if (customSection) customSection.classList.add('hidden');
+    if (this.elements.actionsSection) this.elements.actionsSection.classList.add('hidden');
+
     this.showThinking('Analyzing website theme...');
 
     try {
@@ -741,7 +746,7 @@ export class WidgetCustomizerModule {
     const instruction = parts.join('. ') + '.';
 
     this.showThinking('Applying customizations...');
-    if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = true;
+    this.setCustomizationButtonsEnabled(false);
 
     try {
       const response = await fetch(`${this.apiBase}/widget/customize`, {
@@ -780,7 +785,7 @@ export class WidgetCustomizerModule {
       this.hideThinking();
       this.showError(`Customization failed: ${error.message}`);
     } finally {
-      if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = false;
+      this.setCustomizationButtonsEnabled(true);
     }
   }
 
@@ -795,7 +800,7 @@ export class WidgetCustomizerModule {
     }
 
     this.showThinking('Generating new color scheme...');
-    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = true;
+    this.setCustomizationButtonsEnabled(false);
 
     try {
       const response = await fetch(`${this.apiBase}/widget/recolor`, {
@@ -829,7 +834,7 @@ export class WidgetCustomizerModule {
       this.hideThinking();
       this.showError(`Recolor failed: ${error.message}`);
     } finally {
-      if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = false;
+      this.setCustomizationButtonsEnabled(true);
     }
   }
 
@@ -850,6 +855,11 @@ export class WidgetCustomizerModule {
     if (this.elements.widgetThinking) {
       this.elements.widgetThinking.classList.add('hidden');
     }
+  }
+
+  setCustomizationButtonsEnabled(enabled) {
+    if (this.elements.applyAllBtn) this.elements.applyAllBtn.disabled = !enabled;
+    if (this.elements.recolorBtn) this.elements.recolorBtn.disabled = !enabled;
   }
 
   // ========================================
