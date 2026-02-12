@@ -287,57 +287,58 @@ class TestThemeExtractor:
         assert 'text_color' in theme
         assert 'is_dark' in theme
 
-    @patch('widget_customizer.requests.get')
-    def test_extract_theme_from_url(self, mock_get):
-        """Should extract theme from a URL's HTML content."""
-        mock_response = MagicMock()
-        mock_response.text = """
-        <html>
-        <head>
-            <style>
-                body { background-color: #1a1b2e; color: #e2e4f0; }
-                a { color: #667eea; }
-                .btn { background: #764ba2; }
-            </style>
-        </head>
-        <body>
-            <div style="background: #232442;">Content</div>
-        </body>
-        </html>
-        """
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+    def test_extract_with_requests_from_url(self):
+        """Should extract theme from a URL's HTML content via requests fallback."""
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+            <html>
+            <head>
+                <style>
+                    body { background-color: #1a1b2e; color: #e2e4f0; }
+                    a { color: #667eea; }
+                    .btn { background: #764ba2; }
+                </style>
+            </head>
+            <body>
+                <div style="background: #232442;">Content</div>
+            </body>
+            </html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        theme = self.extractor.extract_theme("https://example.com")
-        assert theme is not None
-        assert 'primary_color' in theme
-        assert 'is_dark' in theme
+            theme = self.extractor._extract_with_requests("https://example.com")
+            assert theme is not None
+            assert 'primary_color' in theme
+            assert 'is_dark' in theme
+            assert 'dominant_colors' in theme
+            assert 'computed_styles' in theme
 
-    @patch('widget_customizer.requests.get')
-    def test_extract_theme_with_meta_theme_color(self, mock_get):
+    def test_extract_with_requests_meta_theme_color(self):
         """Should use meta theme-color tag when present."""
-        mock_response = MagicMock()
-        mock_response.text = """
-        <html>
-        <head>
-            <meta name="theme-color" content="#4285f4">
-        </head>
-        <body></body>
-        </html>
-        """
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+            <html>
+            <head>
+                <meta name="theme-color" content="#4285f4">
+            </head>
+            <body></body>
+            </html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        theme = self.extractor.extract_theme("https://example.com")
-        assert theme is not None
+            theme = self.extractor._extract_with_requests("https://example.com")
+            assert theme is not None
 
-    @patch('widget_customizer.requests.get')
-    def test_extract_theme_failure_returns_default(self, mock_get):
-        """Should return default theme when extraction fails."""
-        mock_get.side_effect = Exception("Connection error")
-        theme = self.extractor.extract_theme("https://invalid.example.com")
-        assert theme is not None
-        assert theme == self.extractor._default_theme()
+    def test_extract_with_requests_failure_raises(self):
+        """Should raise when requests fails (caller handles fallback)."""
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_get.side_effect = Exception("Connection error")
+            with pytest.raises(Exception):
+                self.extractor._extract_with_requests("https://invalid.example.com")
 
     def test_resolve_relative_url(self):
         """Should resolve relative URLs correctly."""
@@ -350,6 +351,121 @@ class TestThemeExtractor:
         """Should return the most common item."""
         assert self.extractor._most_common(["#fff", "#000", "#fff"]) == "#fff"
         assert self.extractor._most_common([]) is None
+
+
+# ============================================================
+# ThemeExtractor Playwright & Colorgram Tests
+# ============================================================
+
+class TestThemeExtractorPlaywright:
+    """Tests for Playwright-based theme extraction and colorgram."""
+
+    def setup_method(self):
+        from widget_customizer import ThemeExtractor
+        self.extractor = ThemeExtractor()
+
+    def test_extract_dominant_colors(self):
+        """Should extract colors from screenshot bytes via colorgram."""
+        with patch('widget_customizer.colorgram.extract') as mock_extract, \
+             patch('widget_customizer.Image.open') as mock_open:
+            mock_color1 = MagicMock()
+            mock_color1.rgb.r, mock_color1.rgb.g, mock_color1.rgb.b = 26, 27, 46
+            mock_color1.proportion = 0.45
+            mock_color2 = MagicMock()
+            mock_color2.rgb.r, mock_color2.rgb.g, mock_color2.rgb.b = 102, 126, 234
+            mock_color2.proportion = 0.20
+            mock_extract.return_value = [mock_color1, mock_color2]
+            mock_open.return_value = MagicMock()
+
+            result = self.extractor._extract_dominant_colors(b'fake_png_bytes')
+
+            assert len(result) == 2
+            assert result[0]['color'] == '#1a1b2e'
+            assert result[0]['proportion'] == 0.45
+            assert result[1]['color'] == '#667eea'
+            assert result[1]['proportion'] == 0.2
+
+    def test_extract_dominant_colors_handles_failure(self):
+        """Should return empty list when colorgram fails."""
+        with patch('widget_customizer.Image.open', side_effect=Exception("bad image")):
+            result = self.extractor._extract_dominant_colors(b'bad_bytes')
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_extract_with_playwright_returns_enriched_theme(self):
+        """Should return theme with dominant_colors and computed_styles."""
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.screenshot = AsyncMock(return_value=b'fake_png')
+        mock_page.evaluate = AsyncMock(side_effect=[
+            # First call: computed styles
+            {'body': {'backgroundColor': 'rgb(26, 27, 46)', 'color': 'rgb(226, 228, 240)', 'borderColor': ''}},
+            # Second call: CSS rules
+            'body { background-color: #1a1b2e; color: #e2e4f0; } a { color: #667eea; }',
+        ])
+        mock_page.content = AsyncMock(return_value="""
+            <html><head>
+                <style>body { background-color: #1a1b2e; color: #e2e4f0; }</style>
+            </head><body></body></html>
+        """)
+
+        mock_browser = AsyncMock()
+        mock_browser.new_page = AsyncMock(return_value=mock_page)
+        mock_browser.close = AsyncMock()
+
+        mock_pw = AsyncMock()
+        mock_pw.chromium.launch = AsyncMock(return_value=mock_browser)
+
+        with patch('widget_customizer.async_playwright') as mock_pw_fn, \
+             patch('widget_customizer.colorgram.extract') as mock_colorgram, \
+             patch('widget_customizer.Image.open') as mock_img_open:
+            mock_pw_fn.return_value.__aenter__ = AsyncMock(return_value=mock_pw)
+            mock_pw_fn.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            mock_color = MagicMock()
+            mock_color.rgb.r, mock_color.rgb.g, mock_color.rgb.b = 26, 27, 46
+            mock_color.proportion = 0.5
+            mock_colorgram.return_value = [mock_color]
+            mock_img_open.return_value = MagicMock()
+
+            theme = await self.extractor._extract_with_playwright('https://example.com')
+
+        assert 'dominant_colors' in theme
+        assert 'computed_styles' in theme
+        assert len(theme['dominant_colors']) == 1
+        assert theme['dominant_colors'][0]['color'] == '#1a1b2e'
+        assert 'body' in theme['computed_styles']
+        assert 'primary_color' in theme
+        assert 'is_dark' in theme
+
+    @pytest.mark.asyncio
+    async def test_extract_theme_falls_back_to_requests(self):
+        """Should fall back to requests when Playwright fails."""
+        with patch('widget_customizer.async_playwright', side_effect=Exception("No browser")), \
+             patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+                <html><head><style>body { background: #fff; color: #333; }</style></head>
+                <body></body></html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
+
+            theme = await self.extractor.extract_theme('https://example.com')
+
+            assert theme is not None
+            assert 'primary_color' in theme
+            assert theme['dominant_colors'] == []
+            assert theme['computed_styles'] == {}
+
+    @pytest.mark.asyncio
+    async def test_extract_theme_returns_default_when_both_fail(self):
+        """Should return default theme when both Playwright and requests fail."""
+        with patch('widget_customizer.async_playwright', side_effect=Exception("No browser")), \
+             patch('widget_customizer.requests.get', side_effect=Exception("Network error")):
+            theme = await self.extractor.extract_theme('https://invalid.example.com')
+
+            assert theme == self.extractor._default_theme()
 
 
 # ============================================================
@@ -697,13 +813,13 @@ class TestWidgetAPIEndpoints:
              patch('main.WidgetCodeRenderer') as mock_renderer_class:
 
             mock_extractor = MagicMock()
-            mock_extractor.extract_theme.return_value = {
+            mock_extractor.extract_theme = AsyncMock(return_value={
                 'primary_color': '#4285f4',
                 'background_color': '#ffffff',
                 'text_color': '#333333',
                 'accent_color': '#4285f4',
                 'is_dark': False
-            }
+            })
             mock_extractor_class.return_value = mock_extractor
 
             mock_generator = MagicMock()
@@ -964,77 +1080,77 @@ class TestThemeCompatibility:
         from widget_customizer import ThemeExtractor
         self.extractor = ThemeExtractor()
 
-    @patch('widget_customizer.requests.get')
-    def test_dark_website_produces_dark_theme(self, mock_get):
+    def test_dark_website_produces_dark_theme(self):
         """Dark websites should produce dark widget themes."""
-        mock_response = MagicMock()
-        mock_response.text = """
-        <html>
-        <head>
-            <style>
-                body { background-color: #1a1a2e; color: #eaeaea; }
-                .header { background: #16213e; }
-                a { color: #e94560; }
-            </style>
-        </head>
-        <body class="dark-theme">
-            <div class="header">Dark Site</div>
-        </body>
-        </html>
-        """
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+            <html>
+            <head>
+                <style>
+                    body { background-color: #1a1a2e; color: #eaeaea; }
+                    .header { background: #16213e; }
+                    a { color: #e94560; }
+                </style>
+            </head>
+            <body class="dark-theme">
+                <div class="header">Dark Site</div>
+            </body>
+            </html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        theme = self.extractor.extract_theme("https://dark-site.com")
-        assert theme['is_dark'] is True
+            theme = self.extractor._extract_with_requests("https://dark-site.com")
+            assert theme['is_dark'] is True
 
-    @patch('widget_customizer.requests.get')
-    def test_light_website_produces_light_theme(self, mock_get):
+    def test_light_website_produces_light_theme(self):
         """Light websites should produce light widget themes."""
-        mock_response = MagicMock()
-        mock_response.text = """
-        <html>
-        <head>
-            <style>
-                body { background-color: #ffffff; color: #333333; }
-                .header { background: #f5f5f5; }
-                a { color: #007bff; }
-            </style>
-        </head>
-        <body>
-            <div class="header">Light Site</div>
-        </body>
-        </html>
-        """
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+            <html>
+            <head>
+                <style>
+                    body { background-color: #ffffff; color: #333333; }
+                    .header { background: #f5f5f5; }
+                    a { color: #007bff; }
+                </style>
+            </head>
+            <body>
+                <div class="header">Light Site</div>
+            </body>
+            </html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        theme = self.extractor.extract_theme("https://light-site.com")
-        assert theme['is_dark'] is False
+            theme = self.extractor._extract_with_requests("https://light-site.com")
+            assert theme['is_dark'] is False
 
-    @patch('widget_customizer.requests.get')
-    def test_brand_color_extraction(self, mock_get):
+    def test_brand_color_extraction(self):
         """Should extract brand/accent colors from buttons and links."""
-        mock_response = MagicMock()
-        mock_response.text = """
-        <html>
-        <head>
-            <style>
-                body { background: #fff; color: #333; }
-                .btn-primary { background-color: #e74c3c; color: white; }
-                a { color: #e74c3c; }
-                .nav { background-color: #2c3e50; }
-            </style>
-        </head>
-        <body></body>
-        </html>
-        """
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        with patch('widget_customizer.requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.text = """
+            <html>
+            <head>
+                <style>
+                    body { background: #fff; color: #333; }
+                    .btn-primary { background-color: #e74c3c; color: white; }
+                    a { color: #e74c3c; }
+                    .nav { background-color: #2c3e50; }
+                </style>
+            </head>
+            <body></body>
+            </html>
+            """
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
 
-        theme = self.extractor.extract_theme("https://branded-site.com")
-        # Should have extracted some accent colors
-        assert theme['primary_color'] is not None
+            theme = self.extractor._extract_with_requests("https://branded-site.com")
+            # Should have extracted some accent colors
+            assert theme['primary_color'] is not None
 
 
 # ============================================================
@@ -1255,13 +1371,13 @@ class TestRecolorAPIEndpoint:
              patch('main.WidgetCodeRenderer') as mock_renderer_class:
 
             mock_extractor = MagicMock()
-            mock_extractor.extract_theme.return_value = {
+            mock_extractor.extract_theme = AsyncMock(return_value={
                 'primary_color': '#667eea',
                 'background_color': '#0f1029',
                 'text_color': '#e2e4f0',
                 'accent_color': '#667eea',
                 'is_dark': True
-            }
+            })
             mock_extractor_class.return_value = mock_extractor
 
             new_config = WidgetConfig(
@@ -1299,13 +1415,13 @@ class TestRecolorAPIEndpoint:
              patch('main.WidgetCodeRenderer') as mock_renderer_class:
 
             mock_extractor = MagicMock()
-            mock_extractor.extract_theme.return_value = {
+            mock_extractor.extract_theme = AsyncMock(return_value={
                 'primary_color': '#667eea',
                 'background_color': '#0f1029',
                 'text_color': '#e2e4f0',
                 'accent_color': '#667eea',
                 'is_dark': True
-            }
+            })
             mock_extractor_class.return_value = mock_extractor
 
             mock_generator = MagicMock()
