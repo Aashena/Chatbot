@@ -541,7 +541,8 @@
       text-transform: uppercase;
     }
 
-    .custom-fields-row input[type="text"] {
+    .custom-fields-row input[type="text"],
+    .custom-fields-row select {
       width: 100%;
       padding: 10px 14px;
       border: 2px solid #2e3055;
@@ -552,7 +553,23 @@
       transition: border-color 0.2s;
     }
 
-    .custom-fields-row input[type="text"]:focus {
+    .custom-fields-row select {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239498b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    .custom-fields-row select option {
+      background: #232442;
+      color: #e2e4f0;
+    }
+
+    .custom-fields-row input[type="text"]:focus,
+    .custom-fields-row select:focus {
       outline: none;
       border-color: #667eea;
     }
@@ -828,18 +845,30 @@
 
         <div class="custom-fields-row">
           <div class="custom-field">
-            <label class="custom-label">Button Text</label>
+            <label class="custom-label">Widget Text</label>
             <input type="text" id="custom-widget-text" placeholder="Virtual Assistant" />
           </div>
 
           <div class="custom-field">
-            <label class="custom-label">Button Shape</label>
-            <input type="text" id="custom-widget-shape" placeholder="pill" />
+            <label class="custom-label">Widget Shape</label>
+            <select id="custom-widget-shape">
+              <option value="">pill</option>
+              <option value="pill">Pill</option>
+              <option value="circle">Circle</option>
+              <option value="rounded-square">Rounded Square</option>
+            </select>
           </div>
 
           <div class="custom-field">
-            <label class="custom-label">Button Icon</label>
-            <input type="text" id="custom-widget-icon" placeholder="chat" />
+            <label class="custom-label">Widget Icon</label>
+            <select id="custom-widget-icon">
+              <option value="">chat</option>
+              <option value="chat">Chat</option>
+              <option value="robot">Robot</option>
+              <option value="help">Help</option>
+              <option value="headset">Headset</option>
+              <option value="sparkle">Sparkle</option>
+            </select>
           </div>
 
           <div class="custom-field custom-field-apply">

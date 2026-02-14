@@ -111,15 +111,12 @@ export class WidgetCustomizerModule {
       this.elements.recolorBtn.addEventListener('click', () => this.recolorWidget());
     }
 
-    // Enter key on any customization input
-    const inputs = [this.elements.customText, this.elements.customShape, this.elements.customIcon];
-    inputs.forEach(input => {
-      if (input) {
-        input.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') this.applyAllCustomizations();
-        });
-      }
-    });
+    // Enter key on text input
+    if (this.elements.customText) {
+      this.elements.customText.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.applyAllCustomizations();
+      });
+    }
   }
 
   // ========================================
@@ -761,10 +758,13 @@ export class WidgetCustomizerModule {
       this.elements.customText.placeholder = config.button_text || 'Virtual Assistant';
     }
     if (this.elements.customShape) {
-      this.elements.customShape.placeholder = config.button_shape || 'pill';
+      // Update the placeholder option text and reset to it
+      this.elements.customShape.options[0].text = config.button_shape || 'pill';
+      this.elements.customShape.selectedIndex = 0;
     }
     if (this.elements.customIcon) {
-      this.elements.customIcon.placeholder = config.button_icon || 'chat';
+      this.elements.customIcon.options[0].text = config.button_icon || 'chat';
+      this.elements.customIcon.selectedIndex = 0;
     }
   }
 
@@ -821,8 +821,8 @@ export class WidgetCustomizerModule {
 
       // Clear inputs after successful apply
       if (this.elements.customText) this.elements.customText.value = '';
-      if (this.elements.customShape) this.elements.customShape.value = '';
-      if (this.elements.customIcon) this.elements.customIcon.value = '';
+      if (this.elements.customShape) this.elements.customShape.selectedIndex = 0;
+      if (this.elements.customIcon) this.elements.customIcon.selectedIndex = 0;
 
       this.showSuccess('Widget customized successfully!');
     } catch (error) {
