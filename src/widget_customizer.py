@@ -442,7 +442,14 @@ Dominant colors from visual analysis (sorted by area proportion):
 Computed styles from key page elements:
 {computed_styles}
 
-Generate a harmonious widget theme. Use the website's accent/brand colors as the primary widget colors. Pay special attention to the dominant colors — these represent the actual visual appearance of the rendered page. Use the computed styles to understand the site's header, navigation, and button styling. Ensure good readability and contrast. If the website is dark-themed, make the widget dark too.
+Generate a harmonious widget theme. Use the website's accent/brand colors as the primary widget colors. Pay special attention to the dominant colors — these represent the actual visual appearance of the rendered page. Use the computed styles to understand the site's header, navigation, and button styling. If the website is dark-themed, make the widget dark too.
+
+CRITICAL CONTRAST RULES — text must always be legible:
+- user_msg_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (since user messages sit on a gradient of these two colors). If primary/secondary are light (e.g. pastels, warm tones), use a dark text color like #1a1a2e instead of white.
+- bot_msg_text_color MUST contrast well against bot_msg_bg_color (4.5:1 minimum).
+- text_color MUST contrast well against bg_color.
+- input_text_color MUST contrast well against input_bg_color.
+- When in doubt, prefer maximum contrast (dark text on light backgrounds, light text on dark backgrounds).
 
 Return ONLY a valid JSON object with exactly these fields (no extra text):
 {{
@@ -494,8 +501,13 @@ Current widget color scheme (you MUST produce DIFFERENT colors from these):
 Generate a completely NEW color combination that:
 1. Is visually DIFFERENT from the current colors above (use different hues/tones)
 2. Still harmonizes with the website's theme palette, paying attention to the dominant colors and computed styles
-3. Maintains good contrast and readability
-4. Keeps the same dark/light mode as the current widget
+3. Keeps the same dark/light mode as the current widget
+
+CRITICAL CONTRAST RULES — text must always be legible:
+- user_msg_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (user messages use a gradient of these). If primary/secondary are light, use dark text like #1a1a2e.
+- bot_msg_text_color MUST contrast well against bot_msg_bg_color (4.5:1 minimum).
+- input_text_color MUST contrast well against input_bg_color.
+- When in doubt, prefer maximum contrast.
 
 Return ONLY a valid JSON object with exactly these fields (no extra text):
 {{
@@ -532,10 +544,130 @@ RULES:
 4. All color values MUST be valid 6-digit hex codes (e.g. #667eea)
 5. Keep text values under 30 characters
 6. Do NOT add any new fields
-7. Maintain good contrast and readability
+7. CRITICAL: Ensure all text colors have at least 4.5:1 contrast ratio against their backgrounds. user_msg_text_color must contrast against the primary_color/secondary_color gradient. bot_msg_text_color must contrast against bot_msg_bg_color. If backgrounds are light, use dark text and vice versa.
 
 Return ONLY the modified JSON configuration (no extra text, no markdown):
 """)
+
+
+class ContrastChecker:
+    """WCAG 2.0 contrast ratio utilities for ensuring text legibility."""
+
+    MIN_CONTRAST_RATIO = 4.5  # WCAG AA for normal text
+
+    @classmethod
+    def relative_luminance(cls, hex_color: str) -> float:
+        """Calculate relative luminance per WCAG 2.0 definition."""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join(c * 2 for c in hex_color)
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+
+        def linearize(c):
+            c = c / 255.0
+            return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+        return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+
+    @classmethod
+    def contrast_ratio(cls, color1: str, color2: str) -> float:
+        """Calculate WCAG contrast ratio between two hex colors."""
+        try:
+            l1 = cls.relative_luminance(color1)
+            l2 = cls.relative_luminance(color2)
+            lighter = max(l1, l2)
+            darker = min(l1, l2)
+            return (lighter + 0.05) / (darker + 0.05)
+        except Exception:
+            return 1.0
+
+    @classmethod
+    def pick_readable_text_color(cls, bg_color: str, preferred: str, fallback_light: str = '#ffffff', fallback_dark: str = '#1a1a2e') -> str:
+        """Return preferred color if contrast is sufficient, otherwise pick black or white."""
+        if cls.contrast_ratio(bg_color, preferred) >= cls.MIN_CONTRAST_RATIO:
+            return preferred
+        ratio_light = cls.contrast_ratio(bg_color, fallback_light)
+        ratio_dark = cls.contrast_ratio(bg_color, fallback_dark)
+        return fallback_light if ratio_light >= ratio_dark else fallback_dark
+
+    @classmethod
+    def ensure_config_contrast(cls, config: WidgetConfig) -> WidgetConfig:
+        """Validate and fix all text/background contrast pairs in a WidgetConfig."""
+        data = config.model_dump()
+
+        # User message text vs the gradient (check against both endpoints, use the worse)
+        data['user_msg_text_color'] = cls._pick_for_gradient(
+            data['primary_color'], data['secondary_color'],
+            data['user_msg_text_color']
+        )
+
+        # Bot message / thinking bubble must be distinguishable from chat background
+        if cls.contrast_ratio(data['bot_msg_bg_color'], data['bg_color']) < 1.3:
+            data['bot_msg_bg_color'] = data['surface_color']
+            # If surface_color is also too close, darken or lighten it
+            if cls.contrast_ratio(data['bot_msg_bg_color'], data['bg_color']) < 1.3:
+                data['bot_msg_bg_color'] = cls._shift_color(data['bg_color'], data.get('is_dark', True))
+
+        # Bot message text vs bot message background
+        data['bot_msg_text_color'] = cls.pick_readable_text_color(
+            data['bot_msg_bg_color'], data['bot_msg_text_color']
+        )
+
+        # General text vs main background
+        data['text_color'] = cls.pick_readable_text_color(
+            data['bg_color'], data['text_color']
+        )
+
+        # Secondary text vs main background (relaxed to 3:1 for secondary text)
+        if cls.contrast_ratio(data['bg_color'], data['text_secondary_color']) < 3.0:
+            data['text_secondary_color'] = cls.pick_readable_text_color(
+                data['bg_color'], data['text_secondary_color']
+            )
+
+        # Input text vs input background
+        data['input_text_color'] = cls.pick_readable_text_color(
+            data['input_bg_color'], data['input_text_color']
+        )
+
+        # Input placeholder vs input background (relaxed to 3:1)
+        if cls.contrast_ratio(data['input_bg_color'], data['input_placeholder_color']) < 3.0:
+            data['input_placeholder_color'] = cls.pick_readable_text_color(
+                data['input_bg_color'], data['input_placeholder_color']
+            )
+
+        return WidgetConfig(**data)
+
+    @classmethod
+    def _pick_for_gradient(cls, color1: str, color2: str, text_color: str,
+                           fallback_light: str = '#ffffff', fallback_dark: str = '#1a1a2e') -> str:
+        """Pick a text color readable against a gradient (both endpoints must pass)."""
+        ratio1 = cls.contrast_ratio(color1, text_color)
+        ratio2 = cls.contrast_ratio(color2, text_color)
+        if min(ratio1, ratio2) >= cls.MIN_CONTRAST_RATIO:
+            return text_color
+        # Try light and dark against both gradient endpoints
+        light_min = min(cls.contrast_ratio(color1, fallback_light), cls.contrast_ratio(color2, fallback_light))
+        dark_min = min(cls.contrast_ratio(color1, fallback_dark), cls.contrast_ratio(color2, fallback_dark))
+        return fallback_light if light_min >= dark_min else fallback_dark
+
+    @classmethod
+    def _shift_color(cls, hex_color: str, is_dark: bool) -> str:
+        """Shift a color lighter or darker to create visible distinction."""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join(c * 2 for c in hex_color)
+        r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        if is_dark:
+            # Lighten for dark themes
+            r = min(255, r + 30)
+            g = min(255, g + 30)
+            b = min(255, b + 30)
+        else:
+            # Darken for light themes
+            r = max(0, r - 30)
+            g = max(0, g - 30)
+            b = max(0, b - 30)
+        return f'#{r:02x}{g:02x}{b:02x}'
 
 
 class WidgetConfigGenerator:
@@ -564,7 +696,8 @@ class WidgetConfigGenerator:
                 computed_styles=self._format_computed_styles(theme_colors.get('computed_styles', {})),
             )
             response = self.llm.invoke(prompt_text)
-            return self._parse_config_response(response.content)
+            config = self._parse_config_response(response.content)
+            return ContrastChecker.ensure_config_contrast(config)
         except Exception as e:
             logging.error(f"Gemini theme generation failed: {e}")
             return self._config_from_theme_colors(theme_colors)
@@ -598,7 +731,8 @@ class WidgetConfigGenerator:
             # Merge: keep non-color properties from current config, apply new colors
             merged = current_config.model_dump()
             merged.update(new_color_data)
-            return WidgetConfig(**merged)
+            config = WidgetConfig(**merged)
+            return ContrastChecker.ensure_config_contrast(config)
         except Exception as e:
             logging.error(f"Gemini recolor failed: {e}")
             return current_config
@@ -654,7 +788,8 @@ class WidgetConfigGenerator:
                 instruction=sanitized,
             )
             response = self.llm.invoke(prompt_text)
-            return self._parse_config_response(response.content)
+            config = self._parse_config_response(response.content)
+            return ContrastChecker.ensure_config_contrast(config)
         except ValueError:
             raise
         except Exception as e:
@@ -740,6 +875,10 @@ class WidgetCodeRenderer:
         safe_button_text = self._escape_js_string(config.button_text)
         safe_header_title = self._escape_js_string(config.header_title)
         safe_placeholder = self._escape_js_string(config.input_placeholder)
+
+        # Thinking dots sit on bot_msg_bg_color — reuse bot_msg_text_color
+        # which is already contrast-checked against that background.
+        thinking_dot_color = config.bot_msg_text_color
 
         # The button inner HTML depends on shape
         if config.button_shape == 'circle':
@@ -888,6 +1027,7 @@ class WidgetCodeRenderer:
       padding: 12px 16px !important;\\
       background: {config.bot_msg_bg_color} !important;\\
       border-radius: 18px !important;\\
+      border: 1px solid {config.border_color} !important;\\
       box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;\\
     }}\\
     .cw-think span {{\\
@@ -895,7 +1035,7 @@ class WidgetCodeRenderer:
       width: 8px !important;\\
       height: 8px !important;\\
       border-radius: 50% !important;\\
-      background: {config.primary_color} !important;\\
+      background: {thinking_dot_color} !important;\\
       animation: cwBounce 1.4s infinite ease-in-out !important;\\
     }}\\
     .cw-think span:nth-child(1) {{ animation-delay: -0.32s !important; }}\\
