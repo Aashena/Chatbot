@@ -417,7 +417,7 @@ export class WidgetCustomizerModule {
         width: 8px !important;
         height: 8px !important;
         border-radius: 50% !important;
-        background: ${config.primary_color} !important;
+        background: ${config.bot_msg_text_color} !important;
         animation: liveCwBounce 1.4s infinite ease-in-out !important;
       }
       .live-cw-think span:nth-child(1) { animation-delay: -0.32s !important; }
