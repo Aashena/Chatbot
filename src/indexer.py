@@ -90,7 +90,7 @@ def remove_duplicate_chunks(chunks):
     return unique_chunks
 
 async def load_web_docs_parallel(urls, delay, max_workers):
-    browser_config = BrowserConfig(headless=True, verbose=False, 
+    browser_config = BrowserConfig(headless=True, verbose=False,
     extra_args=[f'--user-agent={USER_AGENT}'] )
     run_config = CrawlerRunConfig(
         cache_mode=CacheMode.BYPASS,
@@ -101,9 +101,40 @@ async def load_web_docs_parallel(urls, delay, max_workers):
         #remove_overlay_elements=True
     )
 
+    async def before_retrieve_html(page, context=None, config=None, **kwargs):
+        """
+        Fires just before page.content() is called, so DOM changes here are captured.
+        1. Waits for networkidle so JS frameworks (React/Vue/etc.) finish hydrating
+           and register their click handlers.
+        2. Clicks all JS-only trigger links (a[href="#"]) to inject dynamic content
+           such as modals and accordions into the DOM.
+        3. Waits briefly for the framework to re-render after the clicks.
+        4. Reveals any remaining CSS-hidden elements (handles both inline styles
+           and class-based hiding via computed style).
+        """
+        try:
+            await page.wait_for_load_state('networkidle', timeout=10000)
+            await page.evaluate("""
+                document.querySelectorAll('a[href="#"], a[href="javascript:void(0)"], a[href="javascript:;"]')
+                    .forEach(el => { try { el.click(); } catch(e) {} });
+            """)
+            await page.wait_for_timeout(1000)
+            await page.evaluate("""
+                document.querySelectorAll('*').forEach(el => {
+                    const style = window.getComputedStyle(el);
+                    if (style.display === 'none') el.style.setProperty('display', 'block', 'important');
+                    if (style.visibility === 'hidden') el.style.setProperty('visibility', 'visible', 'important');
+                });
+                document.querySelectorAll('[hidden]').forEach(el => el.removeAttribute('hidden'));
+                document.querySelectorAll('[aria-hidden="true"]').forEach(el => el.removeAttribute('aria-hidden'));
+            """)
+        except Exception as e:
+            print(f"Hook error in before_retrieve_html: {e}")
+
     documents = []
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
+        crawler.crawler_strategy.set_hook('before_retrieve_html', before_retrieve_html)
         # Use arun_many for parallel execution
         results = await crawler.arun_many(urls=urls, config=run_config)
 
