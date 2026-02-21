@@ -508,6 +508,77 @@ class TestWidgetConfig:
         assert 'primary_color' in d
         assert 'button_text' in d
 
+    def test_default_button_text_color(self):
+        """Default button_text_color should be white."""
+        from widget_customizer import WidgetConfig
+        config = WidgetConfig()
+        assert config.button_text_color == "#ffffff"
+
+
+# ============================================================
+# ContrastChecker Tests
+# ============================================================
+
+class TestContrastChecker:
+    """Tests for WCAG contrast checking of button/header colors."""
+
+    def test_button_text_color_stays_white_for_dark_gradient(self):
+        """White text should pass against dark primary/secondary colors."""
+        from widget_customizer import ContrastChecker, WidgetConfig
+        config = WidgetConfig(
+            primary_color="#667eea",
+            secondary_color="#764ba2",
+            button_text_color="#ffffff",
+        )
+        result = ContrastChecker.ensure_config_contrast(config)
+        assert result.button_text_color == "#ffffff"
+
+    def test_button_text_color_switches_to_dark_for_light_gradient(self):
+        """Dark text should be chosen when primary/secondary colors are light."""
+        from widget_customizer import ContrastChecker, WidgetConfig
+        # Very light pastel colors — white text would be invisible
+        config = WidgetConfig(
+            primary_color="#ffe0b2",
+            secondary_color="#ffcc80",
+            button_text_color="#ffffff",
+        )
+        result = ContrastChecker.ensure_config_contrast(config)
+        # White has very low contrast against these light colors — should switch to dark
+        assert result.button_text_color != "#ffffff"
+        # Verify the result actually passes contrast against both gradient endpoints
+        ratio1 = ContrastChecker.contrast_ratio(config.primary_color, result.button_text_color)
+        ratio2 = ContrastChecker.contrast_ratio(config.secondary_color, result.button_text_color)
+        assert min(ratio1, ratio2) >= ContrastChecker.MIN_CONTRAST_RATIO
+
+    def test_ensure_config_contrast_fixes_button_text_color(self):
+        """ensure_config_contrast should correct an inaccessible button_text_color."""
+        from widget_customizer import ContrastChecker, WidgetConfig
+        # Light gradient where white fails
+        config = WidgetConfig(
+            primary_color="#f0f0f0",
+            secondary_color="#e0e0e0",
+            button_text_color="#ffffff",
+        )
+        result = ContrastChecker.ensure_config_contrast(config)
+        ratio1 = ContrastChecker.contrast_ratio(config.primary_color, result.button_text_color)
+        ratio2 = ContrastChecker.contrast_ratio(config.secondary_color, result.button_text_color)
+        assert min(ratio1, ratio2) >= ContrastChecker.MIN_CONTRAST_RATIO
+
+    def test_button_text_color_in_rendered_code(self):
+        """Rendered widget code should use button_text_color instead of hardcoded white."""
+        from widget_customizer import WidgetConfig, WidgetCodeRenderer
+        config = WidgetConfig(
+            primary_color="#ffe0b2",
+            secondary_color="#ffcc80",
+            button_text_color="#1a1a2e",  # dark text for light gradient
+        )
+        renderer = WidgetCodeRenderer()
+        code = renderer.render(config, "test-ns", "https://api.example.com")
+        assert "#1a1a2e" in code
+        # Should not have hardcoded 'fill: white' or 'color: white'
+        assert "fill: white" not in code
+        assert "color: white" not in code
+
 
 # ============================================================
 # WidgetConfigGenerator Tests
