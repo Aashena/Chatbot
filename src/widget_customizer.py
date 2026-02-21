@@ -132,6 +132,7 @@ class WidgetConfig(BaseModel):
     input_bg_color: str = "#232442"
     input_text_color: str = "#e2e4f0"
     input_placeholder_color: str = "#6b70a0"
+    button_text_color: str = "#ffffff"  # text & icon color on gradient button and header
 
     # Widget button
     button_text: str = "Virtual Assistant"
@@ -446,6 +447,7 @@ Generate a harmonious widget theme. Use the website's accent/brand colors as the
 
 CRITICAL CONTRAST RULES — text must always be legible:
 - user_msg_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (since user messages sit on a gradient of these two colors). If primary/secondary are light (e.g. pastels, warm tones), use a dark text color like #1a1a2e instead of white.
+- button_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (it is used for text and icons on the widget button and header, which share the same gradient).
 - bot_msg_text_color MUST contrast well against bot_msg_bg_color (4.5:1 minimum).
 - text_color MUST contrast well against bg_color.
 - input_text_color MUST contrast well against input_bg_color.
@@ -466,6 +468,7 @@ Return ONLY a valid JSON object with exactly these fields (no extra text):
   "input_bg_color": "#hex",
   "input_text_color": "#hex",
   "input_placeholder_color": "#hex",
+  "button_text_color": "#hex",
   "button_text": "Virtual Assistant",
   "button_shape": "pill",
   "button_icon": "chat",
@@ -505,6 +508,7 @@ Generate a completely NEW color combination that:
 
 CRITICAL CONTRAST RULES — text must always be legible:
 - user_msg_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (user messages use a gradient of these). If primary/secondary are light, use dark text like #1a1a2e.
+- button_text_color MUST have at least 4.5:1 contrast ratio against BOTH primary_color and secondary_color (used for text and icons on the widget button and header gradient).
 - bot_msg_text_color MUST contrast well against bot_msg_bg_color (4.5:1 minimum).
 - input_text_color MUST contrast well against input_bg_color.
 - When in doubt, prefer maximum contrast.
@@ -524,6 +528,7 @@ Return ONLY a valid JSON object with exactly these fields (no extra text):
   "input_bg_color": "#hex",
   "input_text_color": "#hex",
   "input_placeholder_color": "#hex",
+  "button_text_color": "#hex",
   "is_dark": true/false
 }}
 
@@ -544,7 +549,7 @@ RULES:
 4. All color values MUST be valid 6-digit hex codes (e.g. #667eea)
 5. Keep text values under 30 characters
 6. Do NOT add any new fields
-7. CRITICAL: Ensure all text colors have at least 4.5:1 contrast ratio against their backgrounds. user_msg_text_color must contrast against the primary_color/secondary_color gradient. bot_msg_text_color must contrast against bot_msg_bg_color. If backgrounds are light, use dark text and vice versa.
+7. CRITICAL: Ensure all text colors have at least 4.5:1 contrast ratio against their backgrounds. user_msg_text_color and button_text_color must both contrast against the primary_color/secondary_color gradient. bot_msg_text_color must contrast against bot_msg_bg_color. If backgrounds are light, use dark text and vice versa.
 
 Return ONLY the modified JSON configuration (no extra text, no markdown):
 """)
@@ -599,6 +604,12 @@ class ContrastChecker:
         data['user_msg_text_color'] = cls._pick_for_gradient(
             data['primary_color'], data['secondary_color'],
             data['user_msg_text_color']
+        )
+
+        # Button label, icon, and header text vs gradient background
+        data['button_text_color'] = cls._pick_for_gradient(
+            data['primary_color'], data['secondary_color'],
+            data['button_text_color']
         )
 
         # Bot message / thinking bubble must be distinguishable from chat background
@@ -880,6 +891,12 @@ class WidgetCodeRenderer:
         # which is already contrast-checked against that background.
         thinking_dot_color = config.bot_msg_text_color
 
+        # Overlay color for "Clear" button background on the gradient header.
+        # Use a light overlay when button text is dark, dark overlay when text is light.
+        lum = ContrastChecker.relative_luminance(config.button_text_color)
+        btn_overlay = "rgba(0,0,0,0.15)" if lum < 0.5 else "rgba(255,255,255,0.2)"
+        btn_overlay_hover = "rgba(0,0,0,0.25)" if lum < 0.5 else "rgba(255,255,255,0.3)"
+
         # The button inner HTML depends on shape
         if config.button_shape == 'circle':
             button_inner_html = f'{icon_svg}'
@@ -919,14 +936,14 @@ class WidgetCodeRenderer:
       gap: 12px !important;\\
       transition: transform 0.2s, box-shadow 0.2s !important;\\
       z-index: 99999 !important;\\
-      color: white !important;\\
+      color: {config.button_text_color} !important;\\
       font-size: 16px !important;\\
       font-weight: 600 !important;\\
       font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif !important;\\
     }}\\
     #cw-btn.cw-hide {{ display: none !important; }}\\
     #cw-btn:hover {{ transform: scale(1.05) !important; box-shadow: 0 6px 16px rgba(0,0,0,0.2) !important; }}\\
-    #cw-btn svg {{ width: 24px !important; height: 24px !important; fill: white !important; flex-shrink: 0 !important; }}\\
+    #cw-btn svg {{ width: 24px !important; height: 24px !important; fill: {config.button_text_color} !important; flex-shrink: 0 !important; }}\\
     #cw-win {{\\
       position: fixed !important;\\
       bottom: 20px !important;\\
@@ -946,7 +963,7 @@ class WidgetCodeRenderer:
     @keyframes cwSlide {{ from {{ opacity: 0; transform: translateY(20px); }} to {{ opacity: 1; transform: translateY(0); }} }}\\
     #cw-hdr {{\\
       background: linear-gradient(135deg, {config.primary_color} 0%, {config.secondary_color} 100%) !important;\\
-      color: white !important;\\
+      color: {config.button_text_color} !important;\\
       padding: 16px 20px !important;\\
       display: flex !important;\\
       justify-content: space-between !important;\\
@@ -955,20 +972,20 @@ class WidgetCodeRenderer:
     #cw-hdr h3 {{ font-size: 16px !important; font-weight: 600 !important; margin: 0 !important; }}\\
     #cw-hdr-actions {{ display: flex !important; gap: 12px !important; align-items: center !important; }}\\
     #cw-clear {{\\
-      background: rgba(255,255,255,0.2) !important;\\
-      border: 1px solid rgba(255,255,255,0.3) !important;\\
-      color: white !important;\\
+      background: {btn_overlay} !important;\\
+      border: 1px solid {btn_overlay_hover} !important;\\
+      color: {config.button_text_color} !important;\\
       font-size: 12px !important;\\
       padding: 6px 12px !important;\\
       border-radius: 16px !important;\\
       cursor: pointer !important;\\
       font-weight: 500 !important;\\
     }}\\
-    #cw-clear:hover {{ background: rgba(255,255,255,0.3) !important; }}\\
+    #cw-clear:hover {{ background: {btn_overlay_hover} !important; }}\\
     #cw-close {{\\
       background: none !important;\\
       border: none !important;\\
-      color: white !important;\\
+      color: {config.button_text_color} !important;\\
       font-size: 24px !important;\\
       cursor: pointer !important;\\
       padding: 0 !important;\\
@@ -1076,7 +1093,7 @@ class WidgetCodeRenderer:
     }}\\
     #cw-send:hover {{ transform: scale(1.05) !important; }}\\
     #cw-send:disabled {{ opacity: 0.5 !important; cursor: not-allowed !important; }}\\
-    #cw-send svg {{ width: 18px !important; height: 18px !important; fill: white !important; }}\\
+    #cw-send svg {{ width: 18px !important; height: 18px !important; fill: {config.button_text_color} !important; }}\\
     @media (max-width: 480px) {{\\
       #cw-win {{ width: calc(100% - 40px) !important; height: calc(100% - 120px) !important; }}\\
     }}\\
